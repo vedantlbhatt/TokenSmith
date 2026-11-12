@@ -23,6 +23,10 @@ const tokenSmithBridge: TokenSmithBridge = {
     ipcRenderer.invoke('engine:resolve-question', request) as Promise<
       Awaited<ReturnType<TokenSmithBridge['resolveChatQuestion']>>
     >,
+  reviewAnswer: (request) =>
+    ipcRenderer.invoke('engine:review-answer', request) as Promise<
+      Awaited<ReturnType<TokenSmithBridge['reviewAnswer']>>
+    >,
   sendChatMessage: async (request, onAnswer) => {
     const listener = (_event: IpcRendererEvent, requestId: string, answer: Parameters<NonNullable<typeof onAnswer>>[0], hasFollowUps: boolean) => {
       if (requestId === request.requestId) onAnswer?.(answer, hasFollowUps)

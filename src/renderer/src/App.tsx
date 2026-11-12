@@ -29,13 +29,13 @@ import { MarkdownSourceViewer } from './MarkdownSourceViewer'
 import { ConversationViewport } from './ConversationViewport'
 import { QuestionEditor } from './QuestionEditor'
 import { normalizeEmbeddingGpuEnabled } from '@shared/embedding-settings'
-import { canExplainSimpler, canRetryWithReasoning, reasoningRetryRequest, replaceQuestion, simplerExplanationRequest, type ChatDraft } from './chat-interactions'
+import { answerReviewRequest, canExplainSimpler, canRetryWithReasoning, canVerifyAnswer, displayedAnswerView, reasoningRetryRequest, replaceQuestion, reviewModelFor, simplerExplanationRequest, type ChatDraft } from './chat-interactions'
 import { SelectedPassagePreview } from './SelectedPassagePreview'
 import './chat-interactions.css'
 import { ThemePicker } from './ThemePicker'
 import { ChatModelPicker } from './ChatModelPicker'
 import { ChatDepthPicker } from './ChatDepthPicker'
-import { AnswerExplanation } from './AnswerExplanation'
+import { AnswerExplanation, type AnswerVerifyControls } from './AnswerExplanation'
 import { answerForDisplay } from '../../shared/study-chat-pipeline'
 import { CloudGeneratorDialog } from './CloudGeneratorDialog'
 import { answerModel, isAnswerModel, migrateConversationModels, selectStudyModel, studyModelTarget, type ModelSelectionTarget } from '@shared/chat-model-selection'
@@ -46,6 +46,7 @@ import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.mjs?url'
 import type { PDFDocumentProxy, TextItem } from 'pdfjs-dist/types/src/display/api'
 import type {
   ApplicationSettings,
+  AnswerReview,
   AnswerView,
   AppStateSnapshot,
   ChatMessage,
@@ -2455,6 +2456,8 @@ function ChatScreen({
   const [pendingExplanationId, setPendingExplanationId] = useState<string | null>(null)
   const [explanationError, setExplanationError] = useState<{ answerId: string; text: string; view: AnswerView } | null>(null)
   const explanationInFlightRef = useRef(false)
+  const [reviewPending, setReviewPending] = useState<{ answerId: string; requestId: string } | null>(null)
+  const [reviewError, setReviewError] = useState<{ answerId: string; text: string } | null>(null)
   const [pendingSources, setPendingSources] = useState<ChatSource[]>([])
   const [chatError, setChatError] = useState<string | null>(null)
   const [expandedMessageId, setExpandedMessageId] = useState<string | null>(null)
@@ -3693,6 +3696,43 @@ function ChatScreen({
     }
   }
 
+  // Verify answer: one extra call, only on request, to the model that wrote the
+  // answer. The review is stored beside the answer and never replaces it.
+  async function verifyAnswer(answerId: string) {
+    if (reviewPending || !window.tokensmith) return
+    const answer = activeConversation.messages.find(message => message.id === answerId)
+    if (!answer) return
+    const choice = reviewModelFor(answer, models, selectedModel)
+    if (!choice.model) return
+    const request = answerReviewRequest(activeConversation.messages, answerId, choice.model, modelSettingsFor(settings, choice.model.id))
+    if (!request) return
+    const view = displayedAnswerView(answer)
+    const targetConversationId = activeConversation.id
+    const requestId = createId('review')
+    setReviewPending({ answerId, requestId })
+    setReviewError(null)
+    try {
+      const reply = await window.tokensmith.reviewAnswer({ ...request, requestId })
+      const review: AnswerReview = { ...reply, sources: request.sources, modelId: choice.model.id,
+        modelName: choice.model.name, sameModel: choice.sameModel, createdAt: new Date().toISOString() }
+      onChatStateChange(current => ({ ...current, conversations: current.conversations.map(conversation =>
+        conversation.id === targetConversationId ? { ...conversation, messages: conversation.messages.map(message =>
+          message.id === answerId ? { ...message, answerReviews: { ...message.answerReviews, [view]: review } } : message
+        ) } : conversation
+      ) }))
+    } catch (error) {
+      if (!(error instanceof Error && /abort/i.test(error.name + error.message))) {
+        setReviewError({ answerId, text: readableErrorMessage(error, 'Could not verify this answer. The answer is unchanged.') })
+      }
+    } finally {
+      setReviewPending(current => current?.requestId === requestId ? null : current)
+    }
+  }
+
+  function cancelVerifyAnswer() {
+    if (reviewPending) void window.tokensmith?.cancelChatRequest?.(reviewPending.requestId).catch(() => {})
+  }
+
   async function submitPrompt(rawPrompt: string, editMessageId?: string, passage?: ChatSelectedPassage) {
     const prompt = rawPrompt.trim()
     if (!prompt || (documentScope.length > 0 && !practiceScopeReady) || catalog.status === 'loading' || (pendingConversationId && !isPreparingFollowUps) || !selectedModel || selectedModel.status !== 'ready' || (editingQuestionId && !editMessageId)) {
@@ -3741,6 +3781,7 @@ function ChatScreen({
     const requestSequence = requestSequenceRef.current + 1
     requestSequenceRef.current = requestSequence
     const activeModelSettings = modelSettingsFor(settings, selectedModel.id)
+    const answerModelId = selectedModel.id
     const searchEmbeddingModels = embeddingModels
     const retrievalSourceLimit = modelAwareRetrievalLimit(settings.maxSources, selectedModel, activeModelSettings)
     let retrievedSources: ChatSource[] | undefined = activeMaterials.length === 0 ? [] : undefined
@@ -3833,7 +3874,8 @@ function ChatScreen({
             conversationContextMode: conversationContextMode === 'clarify' ? undefined : conversationContextMode,
             referenceExchange: rewrittenRequest?.referenceExchange,
             modelSettings: activeModelSettings,
-            applicationSettings: settings.application
+            applicationSettings: settings.application,
+            modelId: answerModelId
           },
           explanationDepth: settings.application.explanationDepthEnabled ? settings.application.explanationDepth : 'standard',
           responseDurationMs: answerDurationMs,
@@ -3969,6 +4011,20 @@ function ChatScreen({
                     explanationError={explanationError?.answerId === message.id ? explanationError.text : undefined}
                     explanationErrorView={explanationError?.answerId === message.id ? explanationError.view : undefined}
                     onSelectExplanationView={(view) => selectExplanationView(message.id, view)}
+                    verify={(() => {
+                      if (!canVerifyAnswer(message) && reviewPending?.answerId !== message.id && reviewError?.answerId !== message.id) {
+                        return { pending: false, onOpenSource: (source: ChatSource, sources: ChatSource[]) => { sourcePreview.dismiss(); void reader.open(source, sources) } }
+                      }
+                      const choice = reviewModelFor(message, models, selectedModel)
+                      return {
+                        onVerify: choice.model && !reviewPending ? () => void verifyAnswer(message.id) : undefined,
+                        disabledReason: choice.unavailableReason ?? (reviewPending ? 'Another answer is being verified.' : undefined),
+                        pending: reviewPending?.answerId === message.id,
+                        error: reviewError?.answerId === message.id ? reviewError.text : undefined,
+                        onCancel: cancelVerifyAnswer,
+                        onOpenSource: (source: ChatSource, sources: ChatSource[]) => { sourcePreview.dismiss(); void reader.open(source, sources) }
+                      }
+                    })()}
                     onSelectFollowUp={handleUseFollowUpSuggestion}
                     onToggleSources={() => {
                       setFocusedAnswerId(message.id)
@@ -4308,7 +4364,8 @@ function AssistantMessage({
   explanationErrorView,
   onSelectExplanationView,
   onSelectFollowUp,
-  onToggleSources
+  onToggleSources,
+  verify
 }: {
   expanded: boolean
   message: ChatMessage
@@ -4324,6 +4381,7 @@ function AssistantMessage({
   onSelectExplanationView: (view: AnswerView) => void
   onSelectFollowUp: (suggestion: string) => void
   onToggleSources: () => void
+  verify?: AnswerVerifyControls
 }) {
   const displayed = answerForDisplay(message)
   const sources = showSources ? displayed.sources ?? [] : []
@@ -4348,7 +4406,7 @@ function AssistantMessage({
         )}
         <AnswerExplanation message={message} pending={explanationPending} error={explanationError}
           errorView={explanationErrorView} disabled={suggestionsDisabled} onSimplify={onExplainSimpler}
-          onReasoning={onTryReasoning} onPractice={onPractice} practiceDisabled={practiceDisabled} onSelectView={onSelectExplanationView} />
+          onReasoning={onTryReasoning} onPractice={onPractice} practiceDisabled={practiceDisabled} onSelectView={onSelectExplanationView} verify={verify} />
         {suggestions.length > 0 && (
           <section className="follow-up-section" aria-label="Suggested follow-up questions">
             <div className="follow-up-title">

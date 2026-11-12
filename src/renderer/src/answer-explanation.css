@@ -50,3 +50,34 @@
 .answer-simplifying small { display: block; font-size: inherit; }
 .answer-simplify-error { color: var(--danger, #a63428); font-size: 0.86rem; }
 .answer-version-switch button:focus-visible, .answer-simplify-action button:focus-visible, .study-action-button:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+
+/* Verify answer: a separate review panel under the unchanged answer. */
+.answer-review { margin: 14px 0 6px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface, #fff); font-size: 0.88rem; line-height: 1.5; }
+.answer-review header { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; }
+.answer-review h4 { margin: 0; font-size: 0.92rem; }
+.answer-review-summary { color: var(--content-muted, #4f5359); font-size: 0.8rem; }
+.answer-review-caveat { margin: 6px 0 4px; color: var(--content-muted, #4f5359); font-size: 0.8rem; }
+.answer-review-group { margin-top: 12px; padding-left: 10px; border-left: 3px solid var(--line); }
+.answer-review-group h5 { margin: 0 0 4px; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--content-muted, #4f5359); }
+.answer-review-group ul { margin: 0; padding: 0; list-style: none; }
+.answer-review-group li { padding: 6px 0; border-top: 1px solid var(--line); }
+.answer-review-group li:first-child { border-top: 0; }
+.answer-review-claim { margin: 0; color: var(--ink); }
+.answer-review-note { margin: 2px 0 0; color: var(--content-muted, #4f5359); font-size: 0.82rem; }
+.answer-review-passages { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 5px; }
+.answer-review-passages button, .answer-review-correction > button, .answer-review-pending button { padding: 3px 8px; border: 1px solid var(--line); border-radius: 6px; color: var(--ink); background: transparent; font-size: 0.78rem; font-weight: 600; cursor: pointer; }
+.answer-review-passages button:hover, .answer-review-correction > button:hover, .answer-review-pending button:hover { background: var(--surface-muted, #f1f2f1); }
+.answer-review button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.verdict-contradicted { border-left-color: #b3261e; }
+.verdict-contradicted h5 { color: #b3261e; }
+.verdict-unsupported { border-left-color: #b26a00; }
+.verdict-unsupported h5 { color: #8a5300; }
+.verdict-supported { border-left-color: #2e7d4f; }
+.verdict-supported h5 { color: #2e6b45; }
+.verdict-background, .verdict-assumption { border-left-color: #9aa0a6; }
+.answer-review-correction { margin-top: 12px; }
+.answer-review-correction-text { margin-top: 8px; padding: 10px 12px; border-radius: 8px; background: var(--surface-muted, #f1f2f1); }
+.answer-review-footer { margin: 10px 0 0; color: var(--content-muted, #4f5359); font-size: 0.76rem; }
+.answer-review-pending { display: flex; align-items: center; gap: 9px; color: var(--content-muted, #4f5359); }
+.answer-review-pending span { flex: 1; }
+.answer-review-evidence { margin: 4px 0 0; padding: 2px 0 2px 9px; border-left: 2px solid var(--line); color: var(--content-muted, #4f5359); font-size: 0.82rem; font-style: italic; }

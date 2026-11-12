@@ -7,7 +7,8 @@ import type {
   EngineQuestionSuggestionRequest,
   EngineQuestionSuggestionResponse
 } from '../../shared/engine'
-import type { EngineQuestionRewriteRequest, QuestionRewrite } from '../../shared/engine'
+import type { EngineAnswerReviewRequest, EngineAnswerReviewResponse, EngineQuestionRewriteRequest, QuestionRewrite } from '../../shared/engine'
+import { answerReviewMessages, parseAnswerReview, reviewOutputTokens } from './answer-review'
 import { createLatencyTrace, startLatencySpan, type LatencySpan } from '../../shared/latency-trace'
 import { remoteChatParameters } from './remote-chat-parameters'
 import { remoteGeneratorFetch } from './remote-generator-network'
@@ -191,6 +192,25 @@ export async function resolveRemoteChatQuestion(request: EngineQuestionRewriteRe
     durationMs: performance.now() - started
   })
   return resolution
+}
+
+export async function reviewRemoteAnswer(request: EngineAnswerReviewRequest, signal?: AbortSignal): Promise<EngineAnswerReviewResponse> {
+  assertRemoteModel(request.model)
+  if (request.modelSettings?.contextLengthMode === 'auto') request = { ...request, model: await withModelContextMetadata(request.model) }
+  assertRemoteModel(request.model)
+  const started = performance.now()
+  const settings = modelAwareRuntimeSettings(request) ?? request.modelSettings
+  const runtime = { ...request, modelSettings: settings }
+  const messages = answerReviewMessages(runtime)
+  const modelName = normalizeListedModelId(request.model.remoteModelName, request.model.baseUrl)
+  const text = await runRemoteChatCompletion({
+    endpoint: `${normalizeBaseUrl(request.model.baseUrl)}/chat/completions`,
+    modelName, apiKey: request.model.apiKey, settings, maxOutputTokens: request.model.maxOutputTokens
+  }, messages, { maxTokens: reviewOutputTokens(runtime), temperature: 0, requireComplete: true, signal })
+  const durationMs = Math.round(performance.now() - started)
+  const review = parseAnswerReview(text, request.answer, request.sources)
+  writeTokenSmithLog('answer_review', { modelName, question: request.question, rawResponse: text, review, durationMs })
+  return { ...review, modelName, durationMs }
 }
 
 async function generateRemoteFollowUpSuggestions(

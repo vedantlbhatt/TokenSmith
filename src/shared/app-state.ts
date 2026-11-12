@@ -198,6 +198,34 @@ export interface AnswerVariant {
   latencyTrace?: LatencyTrace
 }
 
+export type ReviewVerdict = 'supported' | 'contradicted' | 'unsupported' | 'background'
+
+export interface ReviewClaim {
+  claim: string
+  verdict: ReviewVerdict
+  // 1-based numbers into the passages the answer was given (its displayed sources).
+  passages: number[]
+  // The reviewer's quote from those passages, checked to appear in them.
+  evidence?: string
+  note: string
+}
+
+// A second pass by a generator model over one displayed answer. It is a review,
+// not a correctness guarantee: the same model can repeat its own mistakes.
+export interface AnswerReview {
+  claims: ReviewClaim[]
+  missingAssumptions: string[]
+  correctedExplanation?: string
+  // The sources the review was given, in the order its passage numbers refer to.
+  sources: ChatSource[]
+  modelId: string
+  modelName: string
+  // True when the reviewing model is the one that wrote the answer.
+  sameModel: boolean
+  durationMs: number
+  createdAt: string
+}
+
 export interface ChatMessage {
   id: string
   role: MessageRole
@@ -217,10 +245,14 @@ export interface ChatMessage {
     referenceExchange?: { question: string; answer: string }
     modelSettings?: ModelRuntimeSettings
     applicationSettings?: ApplicationSettings
+    // The model that wrote this answer, so Verify answer can reuse it.
+    modelId?: string
   }
   simplerExplanation?: AnswerVariant
   reasoningAnswer?: AnswerVariant
   explanationView?: AnswerView
+  // One review per answer version, since each version is a different text.
+  answerReviews?: Partial<Record<AnswerView, AnswerReview>>
   responseDurationMs?: number
   followUpSuggestions?: string[]
   followUpError?: string

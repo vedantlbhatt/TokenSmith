@@ -17,6 +17,8 @@ import type {
   LibrarySearchResult,
   EngineQuestionSuggestionRequest,
   EngineQuestionSuggestionResponse,
+  EngineAnswerReviewRequest,
+  EngineAnswerReviewResponse,
   EngineQuestionRewriteRequest,
   QuestionRewrite,
   MarkdownSourceDocument,
@@ -59,6 +61,7 @@ export interface TokenSmithBridge {
   sendChatMessage: (request: EngineChatRequest, onAnswer?: (answer: EngineChatResponse, hasFollowUps: boolean) => void) => Promise<EngineChatResponse>
   cancelChatRequest: (requestId: string) => Promise<void>
   resolveChatQuestion: (request: EngineQuestionRewriteRequest) => Promise<QuestionRewrite>
+  reviewAnswer: (request: EngineAnswerReviewRequest) => Promise<EngineAnswerReviewResponse>
   suggestChatQuestions: (requestId: string, request: EngineQuestionSuggestionRequest) => Promise<EngineQuestionSuggestionResponse>
   cancelChatQuestionSuggestions: (requestId: string) => Promise<void>
   starterSources: (materials: CourseMaterial[], limit?: number, documents?: StudyDocumentRef[]) => Promise<ChatSource[]>

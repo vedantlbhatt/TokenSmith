@@ -11,12 +11,12 @@ import type {
   EngineQuestionSuggestionRequest,
   EngineQuestionSuggestionResponse
 } from '../../shared/engine'
-import type { EngineQuestionRewriteRequest, QuestionRewrite } from '../../shared/engine'
+import type { EngineAnswerReviewRequest, EngineAnswerReviewResponse, EngineQuestionRewriteRequest, QuestionRewrite } from '../../shared/engine'
 import { modelWithRememberedRemoteApiKey } from './remote-model-secrets'
-import { resolveRemoteChatQuestion } from './remote-chat-service'
+import { resolveRemoteChatQuestion, reviewRemoteAnswer } from './remote-chat-service'
 import type { ChatSource } from '../../shared/app-state'
 import { generateStudyQuestionSuggestions, listStudyEngines, sendStudyChatMessage } from './study-engine-core'
-import { generateOllamaStudyQuestionSuggestions, resolveOllamaChatQuestion, runOllamaStudyEngine } from './ollama-service'
+import { generateOllamaStudyQuestionSuggestions, resolveOllamaChatQuestion, reviewOllamaAnswer, runOllamaStudyEngine } from './ollama-service'
 import { questionSuggestionMessages, sourceContextBudgetForRequest, studyChatMessages } from './study-chat-format'
 
 async function withStarterSources(
@@ -80,6 +80,15 @@ export async function resolveChatQuestion(request: EngineQuestionRewriteRequest,
     return resolveRemoteChatQuestion({ ...request, model: modelWithRememberedRemoteApiKey(request.model) }, signal)
   }
   throw new Error('Question rewriting requires an Ollama or remote chat model.')
+}
+
+// Verify answer: one extra call to the generator, made only when the student asks.
+export async function reviewAnswer(request: EngineAnswerReviewRequest, signal?: AbortSignal): Promise<EngineAnswerReviewResponse> {
+  if (request.model.engine === 'ollama') return reviewOllamaAnswer(request, signal)
+  if (request.model.engine === 'remote') {
+    return reviewRemoteAnswer({ ...request, model: modelWithRememberedRemoteApiKey(request.model) }, signal)
+  }
+  throw new Error('Verify answer requires an Ollama or remote chat model.')
 }
 
 export async function suggestChatQuestions(

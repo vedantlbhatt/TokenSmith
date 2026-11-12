@@ -11,7 +11,8 @@ import type {
   EngineQuestionSuggestionRequest,
   EngineQuestionSuggestionResponse
 } from '../../shared/engine'
-import type { EngineQuestionRewriteRequest, QuestionRewrite } from '../../shared/engine'
+import type { EngineAnswerReviewRequest, EngineAnswerReviewResponse, EngineQuestionRewriteRequest, QuestionRewrite } from '../../shared/engine'
+import { answerReviewMessages, answerReviewSchema, answerSentences, parseAnswerReview, reviewOutputTokens } from './answer-review'
 import { answerReasoningSettings, reasoningMode } from '../../shared/reasoning'
 import { effectiveContextLength, localContextForTokens, usesAutomaticContext } from '../../shared/model-context'
 import { withModelContextMetadata } from './model-context-metadata'
@@ -1035,6 +1036,31 @@ export async function resolveOllamaChatQuestion(request: EngineQuestionRewriteRe
     writeTokenSmithLog('chat_question_rewrite_error', {
       modelName: request.model.ollamaModelName, prompt: request.prompt, rawResponse: text,
       error: errorMessage(error, 'Question rewrite failed.')
+    })
+    throw error
+  }
+}
+
+export async function reviewOllamaAnswer(request: EngineAnswerReviewRequest, signal?: AbortSignal): Promise<EngineAnswerReviewResponse> {
+  assertOllamaModel(request.model)
+  const started = performance.now()
+  const baseUrl = request.model.ollamaBaseUrl || defaultOllamaBaseUrl
+  const runtime = await requestWithOllamaRuntimeContext(request, baseUrl, request.model.ollamaModelName)
+  const messages = answerReviewMessages(runtime)
+  const text = await runOllamaChatCompletion(baseUrl, request.model.ollamaModelName, messages, runtime.modelSettings, {
+    maxTokens: reviewOutputTokens(runtime), temperature: 0, signal,
+    format: answerReviewSchema(answerSentences(request.answer).length, request.sources.length)
+  })
+  const durationMs = Math.round(performance.now() - started)
+  try {
+    const review = parseAnswerReview(text, request.answer, request.sources)
+    writeTokenSmithLog('answer_review', {
+      modelName: request.model.ollamaModelName, question: request.question, rawResponse: text, review, durationMs
+    })
+    return { ...review, modelName: request.model.ollamaModelName, durationMs }
+  } catch (error) {
+    writeTokenSmithLog('answer_review_error', {
+      modelName: request.model.ollamaModelName, rawResponse: text, error: errorMessage(error, 'Answer review failed.')
     })
     throw error
   }

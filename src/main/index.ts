@@ -10,7 +10,7 @@ import { createHash } from 'node:crypto'
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { dirname, extname, isAbsolute, join, parse, relative, resolve } from 'node:path'
-import { listEngines, resolveChatQuestion, sendChatMessage, suggestChatQuestions } from './engine/engine-service'
+import { listEngines, resolveChatQuestion, reviewAnswer, sendChatMessage, suggestChatQuestions } from './engine/engine-service'
 import {
   collections,
   cancelCollectionIndexing,
@@ -57,6 +57,7 @@ import type { CleaningProfileId, CleaningRuleId } from '../shared/cleaning'
 import type {
   EngineChatRequest,
   EngineQuestionSuggestionRequest,
+  EngineAnswerReviewRequest,
   EngineQuestionRewriteRequest,
   MarkdownSourceDocument,
   PdfSourceDocument,
@@ -514,6 +515,15 @@ app.whenReady().then(async () => {
     try { return await withModelLoadingProgress(request.requestId, progress => {
       if (!event.sender.isDestroyed()) event.sender.send('engine:model-loading', progress)
     }, controller.signal, () => resolveChatQuestion(request, controller.signal)) }
+    finally { if (chatRequests.get(key) === controller) chatRequests.delete(key) }
+  })
+  ipcMain.handle('engine:review-answer', async (event, request: EngineAnswerReviewRequest) => {
+    const key = `${event.sender.id}:${request.requestId}`
+    const controller = new AbortController()
+    if (request.requestId) chatRequests.set(key, controller)
+    try { return await withModelLoadingProgress(request.requestId, progress => {
+      if (!event.sender.isDestroyed()) event.sender.send('engine:model-loading', progress)
+    }, controller.signal, () => reviewAnswer(request, controller.signal)) }
     finally { if (chatRequests.get(key) === controller) chatRequests.delete(key) }
   })
   ipcMain.handle('engine:cancel-chat', (event, requestId: string) => {

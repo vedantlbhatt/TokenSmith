@@ -60,6 +60,25 @@ export interface EngineChatRequest {
   retrievedSources?: ChatSource[]
 }
 
+export interface EngineAnswerReviewRequest {
+  requestId?: string
+  question: string
+  selectedPassage?: ChatSelectedPassage
+  referenceExchange?: ChatReferenceExchange
+  answer: string
+  sources: ChatSource[]
+  model: LocalModel
+  modelSettings?: ModelRuntimeSettings
+}
+
+export interface EngineAnswerReviewResponse {
+  claims: import('./app-state').ReviewClaim[]
+  missingAssumptions: string[]
+  correctedExplanation?: string
+  modelName: string
+  durationMs: number
+}
+
 // Runtime callbacks stay in the main process; only answer payloads cross IPC.
 export interface EngineRunOptions {
   signal?: AbortSignal

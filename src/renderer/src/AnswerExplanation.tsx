@@ -1,13 +1,24 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
-import { Activity, BookOpen, GraduationCap } from 'lucide-react'
-import type { AnswerView, ChatMessage } from '@shared/app-state'
+import { Activity, BookOpen, GraduationCap, ShieldCheck } from 'lucide-react'
+import type { AnswerView, ChatMessage, ChatSource } from '@shared/app-state'
 import { answerForDisplay } from '../../shared/study-chat-pipeline'
 import { MessageText } from './MessageText'
+import { AnswerReview, AnswerReviewPending } from './AnswerReview'
+import { displayedAnswerView } from './chat-interactions'
 import { prepareLatencyPlan } from './latency-plan'
 import { QueryPlanPanel } from './QueryPlanPanel'
 import './answer-explanation.css'
 
-export function AnswerExplanation({ message, pending, error, errorView, disabled, onSimplify, onReasoning, onPractice, practiceDisabled, onSelectView }: {
+export interface AnswerVerifyControls {
+  onVerify?: () => void
+  disabledReason?: string
+  pending: boolean
+  error?: string
+  onCancel?: () => void
+  onOpenSource: (source: ChatSource, sources: ChatSource[]) => void
+}
+
+export function AnswerExplanation({ message, pending, error, errorView, disabled, onSimplify, onReasoning, onPractice, practiceDisabled, onSelectView, verify }: {
   message: ChatMessage
   pending: boolean
   error?: string
@@ -18,12 +29,15 @@ export function AnswerExplanation({ message, pending, error, errorView, disabled
   onPractice?: () => void
   practiceDisabled?: boolean
   onSelectView: (view: AnswerView) => void
+  verify?: AnswerVerifyControls
 }) {
   const [planOpen, setPlanOpen] = useState(false)
   const panelId = useId()
   const displayed = answerForDisplay(message)
   const plan = useMemo(() => prepareLatencyPlan(displayed.latencyTrace, displayed.responseDurationMs),
     [displayed.latencyTrace, displayed.responseDurationMs])
+  const review = message.answerReviews?.[displayedAnswerView(message)]
+  const showVerify = Boolean(verify && !review && !verify.pending && (verify.onVerify || verify.disabledReason))
   const simple = message.explanationView === 'simple' && Boolean(message.simplerExplanation)
   const reasoning = message.explanationView === 'reasoning' && Boolean(message.reasoningAnswer)
   const simpleButton = useRef<HTMLButtonElement>(null)
@@ -52,7 +66,12 @@ export function AnswerExplanation({ message, pending, error, errorView, disabled
       </button>}
     </div>}
     <div data-chat-selectable data-chat-message-id={message.id}><MessageText text={displayed.text} /></div>
-    {!pending && ((!message.simplerExplanation && onSimplify) || onPractice || plan) && <div className="answer-simplify-action">
+    {!pending && ((!message.simplerExplanation && onSimplify) || onPractice || plan || showVerify) && <div className="answer-simplify-action">
+      {showVerify && <button type="button" disabled={disabled || !verify!.onVerify} onClick={verify!.onVerify}
+        title={verify!.disabledReason ?? 'Check this answer\'s claims against its sources with the model that wrote it'}>
+        <ShieldCheck size={16} aria-hidden="true" />
+        <span>Verify answer</span>
+      </button>}
       {onPractice && <button type="button" disabled={disabled || practiceDisabled} onClick={onPractice}
         title={practiceDisabled ? 'Select documents in Library to practice' : 'Practice using the selected documents'}>
         <GraduationCap size={16} aria-hidden="true" /><span>Practice this topic</span>
@@ -69,5 +88,8 @@ export function AnswerExplanation({ message, pending, error, errorView, disabled
     </div>}
     {!pending && plan && planOpen && <QueryPlanPanel plan={plan} panelId={panelId} answerReadyMs={displayed.responseDurationMs} />}
     {error && !pending && <p className="answer-simplify-error" role="alert">{error}</p>}
+    {verify?.pending && <AnswerReviewPending onCancel={verify.onCancel} />}
+    {verify?.error && !verify.pending && <p className="answer-simplify-error" role="alert">{verify.error}</p>}
+    {review && !pending && <AnswerReview review={review} onOpenSource={verify?.onOpenSource ?? (() => undefined)} />}
   </div>
 }

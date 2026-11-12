@@ -1,6 +1,7 @@
-import type { ApplicationSettings, ChatMessage, ChatSelectedPassage, LocalModel } from '@shared/app-state'
-import type { EngineChatRequest } from '@shared/engine'
-import { lastChatExchange } from '../../shared/study-chat-pipeline'
+import type { AnswerView, ApplicationSettings, ChatMessage, ChatSelectedPassage, LocalModel, ModelRuntimeSettings } from '@shared/app-state'
+import type { EngineAnswerReviewRequest, EngineChatRequest } from '@shared/engine'
+import { answerForDisplay, lastChatExchange } from '../../shared/study-chat-pipeline'
+import { answerModel } from '../../shared/chat-model-selection'
 import { answerReasoningSettings } from '../../shared/reasoning'
 
 export interface ChatDraft {
@@ -82,6 +83,67 @@ export function simplerExplanationRequest(
     retrievedSources: answer.sources,
     modelSettings: context.modelSettings,
     applicationSettings: simplerExplanationSettings(context.settings.application)
+  }
+}
+
+// The answer version the student is looking at; each version gets its own review.
+export function displayedAnswerView(message: ChatMessage): AnswerView {
+  if (message.explanationView === 'reasoning' && message.reasoningAnswer) return 'reasoning'
+  if (message.explanationView === 'simple' && message.simplerExplanation) return 'simple'
+  return 'original'
+}
+
+export function canVerifyAnswer(message: ChatMessage): boolean {
+  if (message.role !== 'assistant' || message.conversationContextMode === 'clarify') return false
+  const displayed = answerForDisplay(message)
+  return Boolean(displayed.text.trim()) && Boolean(displayed.sources?.length) &&
+    !message.answerReviews?.[displayedAnswerView(message)]
+}
+
+export interface ReviewModelChoice {
+  model?: LocalModel
+  // True when the reviewer is known to be the model that wrote the answer.
+  sameModel: boolean
+  unavailableReason?: string
+}
+
+// Verify answer reuses the generator. Answers saved before the generator was
+// recorded fall back to the chat's current model, and say so.
+export function reviewModelFor(message: ChatMessage, models: LocalModel[], chatModel?: LocalModel): ReviewModelChoice {
+  // A simpler or reasoning version may have been written by a later model.
+  const generatorId = answerForDisplay(message).reasoning?.modelId ?? message.answerContext?.modelId
+  if (!generatorId) {
+    return chatModel?.status === 'ready' ? { model: chatModel, sameModel: false }
+      : { sameModel: false, unavailableReason: 'Select a ready chat model to verify this answer.' }
+  }
+  const generator = answerModel(models, generatorId)
+  if (generator?.status === 'ready') return { model: generator, sameModel: true }
+  return { sameModel: false, unavailableReason: `The model that wrote this answer (${generator?.name ?? generatorId}) is not available.` }
+}
+
+export function answerReviewRequest(
+  messages: ChatMessage[], answerId: string, model: LocalModel, modelSettings?: ModelRuntimeSettings
+): EngineAnswerReviewRequest | undefined {
+  const answerIndex = messages.findIndex(message => message.id === answerId)
+  const answer = messages[answerIndex]
+  const question = questionForAnswer(messages, answerId)
+  if (!answer || !question || !canVerifyAnswer(answer)) return undefined
+  const displayed = answerForDisplay(answer)
+  const saved = answer.answerContext
+  const selectedPassage = saved?.selectedPassage ?? question.selectedPassage
+  // Same recovery as Explain more simply for answers saved without context.
+  const referenceExchange = saved
+    ? (saved.conversationContextMode === 'contextual' ? saved.referenceExchange : undefined)
+    : answer.conversationContextMode !== 'standalone'
+      ? lastChatExchange(messages.slice(0, messages.findIndex(message => message.id === question.id))) : undefined
+  return {
+    question: saved?.prompt ?? question.text,
+    ...(selectedPassage ? { selectedPassage } : {}),
+    ...(referenceExchange ? { referenceExchange } : {}),
+    answer: displayed.text,
+    sources: displayed.sources ?? [],
+    model,
+    modelSettings: modelSettings ?? saved?.modelSettings
   }
 }
 
