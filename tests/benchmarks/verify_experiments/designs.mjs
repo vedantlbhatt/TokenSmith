@@ -12,7 +12,7 @@ const stop = new Set(('a an the and or but if then than that this these those is
   'which who whom what when where why how can could would should will may might must do does did not no so such also there their they them we our you your ' +
   'each every all any some more most less many much very only just one two because while however thus therefore since both either neither itself other').split(' '))
 const contentWords = t => t.toLowerCase().replace(/[^a-z0-9+_]+/g, ' ').split(' ').filter(w => w.length > 2 && !stop.has(w))
-const stem = w => w.replace(/(ing|ed|es|s|ly)$/, '')
+const stem = w => w.replace(/(ing|ed|es|s|ly|e)$/, '')
 
 async function topWindows(item, k) {
   item._windows ??= passageWindows(item.passages)
@@ -95,6 +95,44 @@ const designs = {
     return { calls: item.sentences.length, sentences }
   },
   lpEvery: (item) => designs.lp(item, { variant: 'every' }),
+
+  // Per sentence, top 3 windows, three-way answer read from logprobs of the first token.
+  async lp3(item) {
+    const top = await topWindows(item, 3)
+    const sentences = []
+    for (const [i, s] of item.sentences.entries()) {
+      const r = await chat([{ role: 'system', content: 'You check a statement against an excerpt from a textbook. Use only the excerpt, not your own knowledge.\n' +
+        'Reply with one word:\nsupported - the excerpt states this or it follows directly.\ncontradicted - the excerpt says something different (negation, which thing does what, numbers, order, a different definition or reason).\nmissing - the excerpt does not say this.' },
+        { role: 'user', content: `Excerpt:\n${top[i].map(w => w.text).join('\n')}\n\nStatement: ${s.text}\n\nOne word:` }], { num_predict: 1, logprobs: true, top_logprobs: 10 })
+      const p = { s: 0, c: 0, m: 0 }
+      for (const t of r.logprobs?.[0]?.top_logprobs ?? []) {
+        const w = t.token.trim().toLowerCase()
+        if (w.startsWith('sup')) p.s += Math.exp(t.logprob); else if (w.startsWith('con')) p.c += Math.exp(t.logprob); else if (w.startsWith('mis') || w.startsWith('not')) p.m += Math.exp(t.logprob)
+      }
+      const z = p.s + p.c + p.m || 1
+      const score = (p.c + p.m) / z
+      sentences.push({ verdict: score <= 0.5 ? 'supported' : p.c >= p.m ? 'contradicted' : 'unsupported', score, pc: p.c / z, pm: p.m / z, sim: top[i][0].sim })
+    }
+    return { calls: item.sentences.length, sentences }
+  },
+
+  // One call: all passages and all sentences; a constrained yes/no per sentence, scored from the logprob of each verdict token.
+  async lpBatch(item) {
+    const sentences = item.sentences.map(s => ({ id: s.id, text: s.text }))
+    const schema = { type: 'object', properties: Object.fromEntries(sentences.map(s => [String(s.id), { type: 'string', enum: ['yes', 'no'] }])), required: sentences.map(s => String(s.id)) }
+    const r = await chat([{ role: 'system', content: 'You check a tutor\'s answer against course passages. For each numbered sentence, answer "yes" if the passages state it or it follows directly, and "no" if the passages say something different or do not say it. Use only the passages.' },
+      { role: 'user', content: JSON.stringify({ passages: item.passages.map((p, i) => ({ number: i + 1, text: p.text })), sentences }) }],
+    { format: schema, num_predict: 20 * sentences.length + 20, num_ctx: 8192, logprobs: true, top_logprobs: 5 })
+    // Find the verdict tokens in order: tokens that are exactly yes/no inside quotes.
+    const verdictTokens = (r.logprobs ?? []).filter(t => /^(yes|no)$/i.test(t.token.trim()))
+    return { calls: 1, sentences: item.sentences.map((s, i) => {
+      const t = verdictTokens[i]
+      let y = 0, n = 0
+      for (const a of t?.top_logprobs ?? []) { const w = a.token.trim().toLowerCase(); if (w === 'yes') y += Math.exp(a.logprob); else if (w === 'no') n += Math.exp(a.logprob) }
+      const score = y + n ? n / (y + n) : 0.5
+      return { verdict: score > 0.5 ? 'unsupported' : 'supported', score }
+    }) }
+  },
 
   // No model: the share of the sentence's content words that appear nowhere in the
   // passages, and the best embedding similarity to a passage window.
