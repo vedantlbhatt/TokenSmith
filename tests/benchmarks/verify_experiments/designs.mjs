@@ -84,7 +84,20 @@ const designs = {
     const sentences = []
     for (const [i, s] of item.sentences.entries()) {
       const excerpt = top[i].map(w => w.text).join('\n')
-      const q = variant === 'every'
+      if (variant === 'falsify') {
+        // First a few words on what would make the statement false, then the yes/no.
+        const msgs = [{ role: 'system', content: 'You check a statement against an excerpt from a textbook. Use only the excerpt, not your own knowledge.' },
+          { role: 'user', content: `Excerpt:\n${excerpt}\n\nStatement: ${s.text}\n\nIn one short sentence: what does the excerpt say about this, and is there any detail in the statement that the excerpt does not say or says differently?` }]
+        const f = await chat(msgs, { num_predict: 60 })
+        const r = await chat([...msgs, { role: 'assistant', content: f.message.content }, { role: 'user', content: 'So, is the statement supported by the excerpt? Answer Yes or No.' }],
+          { num_predict: 1, logprobs: true, top_logprobs: 10 })
+        const score = 1 - pYes(r)
+        sentences.push({ verdict: score > 0.5 ? 'unsupported' : 'supported', score, sim: top[i][0].sim, why: f.message.content })
+        continue
+      }
+      const q = variant === 'question'
+        ? `A student asked: ${item.question}\n\nExcerpt from the course textbook:\n${excerpt}\n\nA tutor's answer said: ${s.text}\n\nIs this sentence supported by the excerpt? Answer Yes or No.`
+        : variant === 'every'
         ? `Excerpt:\n${excerpt}\n\nStatement: ${s.text}\n\nDoes the excerpt say everything the statement says, with the same meaning? Answer Yes or No.`
         : `Excerpt:\n${excerpt}\n\nStatement: ${s.text}\n\nIs the statement supported by the excerpt? Answer Yes or No.`
       const r = await chat([{ role: 'system', content: 'You check a statement against an excerpt from a textbook. Use only the excerpt, not your own knowledge.' },
@@ -95,6 +108,10 @@ const designs = {
     return { calls: item.sentences.length, sentences }
   },
   lpEvery: (item) => designs.lp(item, { variant: 'every' }),
+  lpK1: (item) => designs.lp(item, { k: 1 }),
+  lpK5: (item) => designs.lp(item, { k: 5 }),
+  lpQ: (item) => designs.lp(item, { variant: 'question' }),
+  lpFalse: (item) => designs.lp(item, { variant: 'falsify' }),
 
   // Per sentence, top 3 windows, three-way answer read from logprobs of the first token.
   async lp3(item) {

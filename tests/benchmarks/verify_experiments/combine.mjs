@@ -5,6 +5,7 @@
 // when score > t. w and t are picked on dev to maximize sentence-level TPR - FPR.
 // Answer flag = any sentence flagged. Held-out numbers use the dev w and t.
 import { readFileSync, existsSync } from 'node:fs'
+import { auc } from './lib.mjs'
 const labels = new Map(JSON.parse(readFileSync('tests/benchmarks/buzzdb_real_answers.json', 'utf8')).answers.map(a => [a.id, a]))
 const [design, prefix, split2 = 'heldout'] = process.argv.slice(2)
 const load = (d, split) => { const f = `${prefix}${d}_${split}.json`; return existsSync(f) ? JSON.parse(readFileSync(f, 'utf8')) : undefined }
@@ -30,7 +31,11 @@ function evaluate(data, w, t, strict = false) {
     })
     if (L.label === 'correct') { ag++; if (any) agf++ } else { ab++; if (any) abf++ }
   }
-  return { tpr: tp / (tp + fn), fpr: fp / (fp + tn), tp, fn, fp, tn, ab, abf, ag, agf }
+  // Threshold-free answer-level AUC of max combined sentence score.
+  const sc = r => Math.max(...r.sents.map(s => w * s.model + (1 - w) * s.lex))
+  const use = data.filter(r => !(strict && labels.get(r.id).borderline))
+  const aucA = auc(use.filter(r => labels.get(r.id).label !== 'correct').map(sc), use.filter(r => labels.get(r.id).label === 'correct').map(sc))
+  return { tpr: tp / (tp + fn), fpr: fp / (fp + tn), tp, fn, fp, tn, ab, abf, ag, agf, aucA }
 }
 const dev = rows('dev')
 let best
@@ -39,7 +44,7 @@ for (const w of ws) for (let t = 0; t <= 1; t += 0.02) {
   const e = evaluate(dev, w, t); const j = e.tpr - e.fpr
   if (!best || j > best.j) best = { w, t, j, e }
 }
-const fmt = (e) => `sentences: wrong flagged ${e.tp}/${e.tp + e.fn}, ok flagged ${e.fp}/${e.fp + e.tn} | answers: bad flagged ${e.abf}/${e.ab}, correct flagged ${e.agf}/${e.ag}`
+const fmt = (e) => `sentences: wrong flagged ${e.tp}/${e.tp + e.fn}, ok flagged ${e.fp}/${e.fp + e.tn} | answers: bad flagged ${e.abf}/${e.ab}, correct flagged ${e.agf}/${e.ag} | answer AUC ${e.aucA.toFixed(2)}`
 console.log(`${design}: frozen w=${best.w} t=${best.t.toFixed(2)} (dev J=${best.j.toFixed(2)})`)
 console.log('  dev     ', fmt(best.e))
 const ho = rows(split2)
