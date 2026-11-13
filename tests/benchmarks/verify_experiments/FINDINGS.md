@@ -122,12 +122,15 @@ Rules frozen on dev before running held-out. Flag-everything baseline: answers 1
 | lp + lexical, w=0.5, t=0.52 (F1) | 9/19, 47/197 | 11/11, 21/25 | 0.73 | 17 s |
 | lexical only, t=0.38 (F1) | 14/19, 31/197 | 10/11, 15/25 | 0.77 | <3 s, 0 LLM calls |
 | lexical only, t=0.16 (J) | (dev: 25/29, 125/252) | (dev: 25/25, 37/44) | 0.67 dev | |
-| shipped | see below | see below | - | ~74 s |
+| shipped (34 of 36; 2 failed with 'structured response exceeded its output limit') | 1/15, 17/197 | 5/9, 12/25 | - | 78 s |
 
 Fisher exact tests on held-out: sentence-level, both lp+lexical (p = 1.5e-4) and lexical (p = 2.5e-7) flag
 wrong sentences far more often than ok ones. Answer-level, neither separates bad from correct answers
 significantly (lexical F1 rule p = 0.12, lp J rule p = 0.54). Caveat: two objectives were tried and both are
 shown, so the lexical F1 row is the better of two looks at held-out.
+
+The shipped one-call review is at chance on held-out real answers: it flags 7% of wrong sentences and 9% of ok
+ones, and 56% of bad answers vs 48% of correct ones.
 
 ### Conclusions
 1. **No design separates correct from wrong whole answers on held-out at a useful level.** The best rule still
