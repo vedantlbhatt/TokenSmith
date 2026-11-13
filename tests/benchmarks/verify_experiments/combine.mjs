@@ -41,7 +41,7 @@ const dev = rows('dev')
 let best
 const ws = design === 'lexical' ? [0] : [0, 0.25, 0.5, 0.75, 1]
 for (const w of ws) for (let t = 0; t <= 1; t += 0.02) {
-  const e = evaluate(dev, w, t); const j = e.tpr - e.fpr
+  const e = evaluate(dev, w, t); const p = e.tp / (e.tp + e.fp || 1); const j = process.env.OBJ === "f1" ? 2 * p * e.tpr / (p + e.tpr || 1) : e.tpr - e.fpr
   if (!best || j > best.j) best = { w, t, j, e }
 }
 const fmt = (e) => `sentences: wrong flagged ${e.tp}/${e.tp + e.fn}, ok flagged ${e.fp}/${e.fp + e.tn} | answers: bad flagged ${e.abf}/${e.ab}, correct flagged ${e.agf}/${e.ag} | answer AUC ${e.aucA.toFixed(2)}`

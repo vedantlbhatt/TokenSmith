@@ -14,7 +14,20 @@ const stop = new Set(('a an the and or but if then than that this these those is
 const contentWords = t => t.toLowerCase().replace(/[^a-z0-9+_]+/g, ' ').split(' ').filter(w => w.length > 2 && !stop.has(w))
 const stem = w => w.replace(/(ing|ed|es|s|ly|e)$/, '')
 
+// Windows ranked by shared content words, weighted by how rare each word is across windows. No embedding model.
+function topWindowsLexical(item, k) {
+  item._windows ??= passageWindows(item.passages)
+  const sets = item._windows.map(w => new Set(contentWords(w.text).map(stem)))
+  const df = new Map(); for (const set of sets) for (const w of set) df.set(w, (df.get(w) ?? 0) + 1)
+  return item.sentences.map(s => {
+    const words = [...new Set(contentWords(s.text).map(stem))]
+    return sets.map((set, j) => [words.reduce((t, w) => t + (set.has(w) ? Math.log(1 + sets.length / df.get(w)) : 0), 0), j])
+      .sort((a, b) => b[0] - a[0]).slice(0, k).map(([sim, j]) => ({ ...item._windows[j], sim }))
+  })
+}
+
 async function topWindows(item, k) {
+  if (process.env.WINDOWS === 'lexical') return topWindowsLexical(item, k)
   item._windows ??= passageWindows(item.passages)
   item._wv ??= await embed(item._windows.map(w => 'search_document: ' + w.text))
   const sv = await embed(item.sentences.map(s => 'search_query: ' + s.text))
@@ -108,6 +121,7 @@ const designs = {
     return { calls: item.sentences.length, sentences }
   },
   lpEvery: (item) => designs.lp(item, { variant: 'every' }),
+  lpLex: (item) => designs.lp(item),
   lpK1: (item) => designs.lp(item, { k: 1 }),
   lpK5: (item) => designs.lp(item, { k: 5 }),
   lpQ: (item) => designs.lp(item, { variant: 'question' }),
