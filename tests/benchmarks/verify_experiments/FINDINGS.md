@@ -122,7 +122,7 @@ Rules frozen on dev before running held-out. Flag-everything baseline: answers 1
 | lp + lexical, w=0.5, t=0.52 (F1) | 9/19, 47/197 | 11/11, 21/25 | 0.73 | 17 s |
 | lexical only, t=0.38 (F1) | 14/19, 31/197 | 10/11, 15/25 | 0.77 | <3 s, 0 LLM calls |
 | lexical only, t=0.16 (J) | (dev: 25/29, 125/252) | (dev: 25/25, 37/44) | 0.67 dev | |
-| shipped (34 of 36; 2 failed with 'structured response exceeded its output limit') | 1/15, 17/197 | 5/9, 12/25 | - | 78 s |
+| shipped (34 of 36; 2 timed out on this slow box) | 1/15, 17/197 | 5/9, 12/25 | - | 78 s |
 
 Fisher exact tests on held-out: sentence-level, both lp+lexical (p = 1.5e-4) and lexical (p = 2.5e-7) flag
 wrong sentences far more often than ok ones. Answer-level, neither separates bad from correct answers
