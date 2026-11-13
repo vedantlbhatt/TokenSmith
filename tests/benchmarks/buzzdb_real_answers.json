@@ -1,0 +1,2172 @@
+{
+ "description": "Real llama3.2 (3B) answers to the BuzzDB verify questions, generated with the app answer path (runOllamaStudyEngine, reasoning off, temperature 0.7, topP 0.4, seeds 1-3) from each case's passages, by tests/benchmarks/verify_experiments/gen_real_answers.mjs. Labels and per-sentence reasons were written by Claude (an AI model), not a human, by reading each answer against its passages. Sentence ids are those of answerSentences() in src/main/engine/answer-review.ts. label: correct | partly_wrong (some sentence wrong or unsupported) | wrong (main point wrong). borderline marks labels or sentences a careful reader could reasonably judge the other way.",
+ "model": "llama3.2",
+ "answers": [
+  {
+   "id": "pinning_needed#1",
+   "caseId": "pinning_needed",
+   "split": "dev",
+   "seed": 1,
+   "question": "Why is page pinning needed in a buffer manager?",
+   "passageIds": [
+    "ch05.084",
+    "ch05.090",
+    "ch02.046"
+   ],
+   "answer": "Page pinning is necessary to prevent silent data corruption or catastrophic crashes that can occur when multiple threads access the same memory location concurrently. In a concurrent environment, if one thread holds onto a page for an extended period while another thread evicts it due to lack of space, the latter thread's subsequent operations on the now-invalid page pointer will result in incorrect query results or system crashes.\n\nThe buffer manager implements pinning to guarantee that pages remain valid and accessible throughout their operation. When a component requests a page, it \"pins\" it, making it ineligible for eviction until explicitly unpinned by the user. This ensures stability while data structures are being actively read or modified.",
+   "generationMs": 29583,
+   "label": "partly_wrong",
+   "borderline": true,
+   "wrongSentences": [
+    {
+     "id": 4,
+     "kind": "contradicted",
+     "why": "The component that requested the page unpins it when finished, not 'the user'."
+    }
+   ]
+  },
+  {
+   "id": "pinning_needed#2",
+   "caseId": "pinning_needed",
+   "split": "dev",
+   "seed": 2,
+   "question": "Why is page pinning needed in a buffer manager?",
+   "passageIds": [
+    "ch05.084",
+    "ch05.090",
+    "ch02.046"
+   ],
+   "answer": "Page pinning is necessary to prevent silent data corruption or catastrophic crashes that can occur when multiple threads access the same memory location simultaneously. \n\nWhen a component requests a page, it \"pins\" it, making it ineligible for eviction by the buffer manager's replacement policy. This ensures that while the page is being actively read or modified, its state remains stable in memory.\n\nIf the buffer manager were to evict a pinned page and flush it to disk without checking if another thread still needs access to it, data corruption could occur when multiple threads try to access the same location with different values (as seen in the example of Thread A trying to read garbage data after the `BufferManager` has evicted its page).",
+   "generationMs": 23508,
+   "label": "correct",
+   "borderline": true,
+   "wrongSentences": [],
+   "note": "Sentence 4 is muddled ('access the same location with different values') but its main point matches the Thread A example."
+  },
+  {
+   "id": "pinning_needed#3",
+   "caseId": "pinning_needed",
+   "split": "dev",
+   "seed": 3,
+   "question": "Why is page pinning needed in a buffer manager?",
+   "passageIds": [
+    "ch05.084",
+    "ch05.090",
+    "ch02.046"
+   ],
+   "answer": "Page pinning is necessary to prevent silent data corruption or catastrophic crashes that can occur when multiple threads access the same memory location concurrently. \n\nWhen a thread requests a page from the `BufferManager`, it implicitly pins the page, ensuring that the buffer manager's replacement policy cannot evict it while the thread is still using it. This prevents the eviction logic from running and snatching the page away while another thread is actively reading or modifying its data.\n\nIf the pinning mechanism were not in place, a concurrent scenario like the one described would unfold: \n\n1.  Thread A requests page 10 and pins it.\n2.  The buffer manager evicts page 10 to make room for another page.\n3.  Meanwhile, Thread B also needs access to a full buffer pool.\n4.  When Thread A resumes its scan of page 10's data after the eviction, it finds that the memory location now contains garbage (data from page 55), leading to incorrect query results or a crash.\n\nBy pinning pages in this way, the `BufferManager` ensures stability and prevents such silent data corruption issues.",
+   "generationMs": 28836,
+   "label": "partly_wrong",
+   "borderline": true,
+   "wrongSentences": [
+    {
+     "id": 2,
+     "kind": "contradicted",
+     "why": "Passage says the implicit pin breaks down with concurrent threads; the answer says it ensures a thread's page cannot be evicted."
+    },
+    {
+     "id": 6,
+     "kind": "unsupported",
+     "why": "Thread B requests a different page (55); 'needs access to a full buffer pool' is not what the passage says."
+    }
+   ]
+  },
+  {
+   "id": "lru_sequential_scan#1",
+   "caseId": "lru_sequential_scan",
+   "split": "dev",
+   "seed": 1,
+   "question": "What is sequential flooding and why does it make LRU fail?",
+   "passageIds": [
+    "ch06.012",
+    "ch05.119",
+    "ch06.064"
+   ],
+   "answer": "Sequential flooding occurs when a database system performs a sequential scan on a large table. This access pattern has no temporal locality, meaning that each page accessed during the scan will not be needed again soon.\n\nAs a result of this scanning process, every single page is read from disk and used exactly once before being evicted to make room for the next page in the sequence. The pages are pushed out by new, sequentially accessed pages, causing older pages with high temporal locality (such as index nodes or metadata pages) to be flushed out.\n\nThis phenomenon makes LRU fail because it constantly churns through pages, performing a disk I/O for every single request, offering no performance benefit over reading directly from the file system. The sequential flooding problem highlights that a \"one size fits all\" replacement policy is not always optimal and demonstrates the need for more sophisticated strategies to mitigate this issue in real-world systems.",
+   "generationMs": 26410,
+   "label": "correct",
+   "borderline": false,
+   "wrongSentences": []
+  },
+  {
+   "id": "lru_sequential_scan#2",
+   "caseId": "lru_sequential_scan",
+   "split": "dev",
+   "seed": 2,
+   "question": "What is sequential flooding and why does it make LRU fail?",
+   "passageIds": [
+    "ch06.012",
+    "ch05.119",
+    "ch06.064"
+   ],
+   "answer": "Sequential flooding occurs when a database system performs a sequential scan on a large table, causing the buffer pool to systematically march through pages from one end to another. This results in every single page access being a cache miss.\n\nLRU fails due to sequential flooding because each page is accessed once and not needed again for the duration of the scan. The LRU policy, which relies heavily on temporal locality (i.e., recently accessed items are likely to be accessed again soon), becomes ineffective when scanning a table with no temporal locality. As a result, every page read from disk during the sequential scan gets evicted just before being replaced by the next page in the sequence.\n\nThis leads to an extremely poor performance: all pages become cache misses, and the hit rate is 0%. The LRU policy's inability to handle this type of access pattern makes it less effective than other replacement policies.",
+   "generationMs": 25797,
+   "label": "correct",
+   "borderline": false,
+   "wrongSentences": []
+  },
+  {
+   "id": "lru_sequential_scan#3",
+   "caseId": "lru_sequential_scan",
+   "split": "dev",
+   "seed": 3,
+   "question": "What is sequential flooding and why does it make LRU fail?",
+   "passageIds": [
+    "ch06.012",
+    "ch05.119",
+    "ch06.064"
+   ],
+   "answer": "Sequential flooding occurs when a database system performs a sequential scan on a large table. This access pattern lacks temporal locality, meaning that each page accessed during the scan will not be needed again soon.\n\nAs a result of this lack of temporal locality, every single page read from disk is used exactly once and then evicted to make room for the next page in the sequence. The pages involved in the sequential scan constantly push out older, potentially valuable pages with high temporal locality, making it difficult for LRU (Least Recently Used) policy to maintain a balanced cache.\n\nThis phenomenon causes every single page access to be a cache miss, resulting in an 0% hit rate and leading to significant performance degradation. The buffer manager is unable to take advantage of the existing data in memory due to the sequential nature of the scan, making LRU fail to provide optimal performance for this type of workload.\n\nThe lack of temporal locality during a sequential scan makes it challenging for LRU policy to maintain an effective cache replacement strategy, ultimately leading to sequential flooding.",
+   "generationMs": 19908,
+   "label": "correct",
+   "borderline": true,
+   "wrongSentences": [],
+   "note": "Sentence 7 muddles cause and effect (LRU difficulty 'leading to' sequential flooding) but is not clearly false."
+  },
+  {
+   "id": "bplus_vs_binary_tree#1",
+   "caseId": "bplus_vs_binary_tree",
+   "split": "dev",
+   "seed": 1,
+   "question": "Why is a B+ tree preferred over a binary search tree for disk-based database indexes?",
+   "passageIds": [
+    "ch09.019",
+    "ch09.023",
+    "ch02.046"
+   ],
+   "answer": "A B+ Tree is preferred over a Binary Search Tree (BST) for disk-based database indexes because of its design that minimizes the number of \"steps\" required to find data, which translates to reducing the number of I/O operations needed.\n\nIn contrast to BSTs where each node represents a single key and two pointers point to child nodes, B+ Trees use large nodes that can hold hundreds or thousands of keys and pointers. This design allows for a much shorter path from the top of the tree (the \"root\") to the data at the bottom (the \"leaves\"), which is crucial when dealing with disk-based storage where I/O operations are significantly slower than accessing memory.\n\nThe high \"fan-out\" in B+ Trees, meaning each node has many children, reduces the search space by a factor of hundreds instead of just two as it would be in BSTs. This results in a much shorter tree height even for large datasets like billions of records. As a result, B+ Trees significantly reduce the number of I/O operations needed to find data, making them more suitable for disk-based database indexes.\n\nThe key reasons why B+ Trees outperform BSTs include:\n\n*   Reduced search space: By having many children per node, B+ Trees can narrow down the search space much faster than BSTs.\n*   Shorter tree height: The design of B+ Trees ensures that even with a large number of keys and pointers in each node, the overall tree remains relatively short.\n*   Efficient I/O operations: With fewer disk reads required to find data, B+ Trees can significantly improve query performance.\n\nOverall, while BSTs are efficient for memory-based storage or when speed is not a concern, B+ Trees offer better performance characteristics due to their design that prioritizes minimizing the number of I/O operations needed.",
+   "generationMs": 48407,
+   "label": "partly_wrong",
+   "borderline": false,
+   "wrongSentences": [
+    {
+     "id": 10,
+     "kind": "unsupported",
+     "why": "Passages never say BSTs are efficient for memory-based storage or 'when speed is not a concern'."
+    }
+   ]
+  },
+  {
+   "id": "bplus_vs_binary_tree#2",
+   "caseId": "bplus_vs_binary_tree",
+   "split": "dev",
+   "seed": 2,
+   "question": "Why is a B+ tree preferred over a binary search tree for disk-based database indexes?",
+   "passageIds": [
+    "ch09.019",
+    "ch09.023",
+    "ch02.046"
+   ],
+   "answer": "A B+ Tree is preferred over a Binary Search Tree (BST) for disk-based database indexes because of its design that minimizes the number of \"steps\" required to find data, which translates to reducing the number of I/O operations needed.\n\nIn contrast to BSTs where each node represents a single key and two pointers are stored, B+ Trees use large nodes that can hold hundreds or even thousands of keys and pointers. This high \"fan-out\" reduces the search space by a factor of hundreds with each step down the tree, rather than just a factor of two as in traditional BSTs.\n\nAs a result, the total height of the B+ Tree remains remarkably small, even for billions of records. This is crucial because accessing data from disk is much slower than accessing it from memory (nanoseconds vs microseconds). By minimizing the number of I/O operations required to find data, B+ Trees can significantly improve performance in database systems that rely on disk storage.\n\nIn summary, while BSTs are efficient for point queries and have a low overhead per node, they require many separate I/O operations when stored on disk. In contrast, B+ Trees use their large nodes and shallow tree structure to reduce the number of I/O operations needed, making them better suited for disk-based database indexes.",
+   "generationMs": 34689,
+   "label": "partly_wrong",
+   "borderline": false,
+   "wrongSentences": [
+    {
+     "id": 7,
+     "kind": "unsupported",
+     "why": "Passages never say BSTs are efficient for point queries or have low per-node overhead."
+    }
+   ]
+  },
+  {
+   "id": "bplus_vs_binary_tree#3",
+   "caseId": "bplus_vs_binary_tree",
+   "split": "dev",
+   "seed": 3,
+   "question": "Why is a B+ tree preferred over a binary search tree for disk-based database indexes?",
+   "passageIds": [
+    "ch09.019",
+    "ch09.023",
+    "ch02.046"
+   ],
+   "answer": "A B+ Tree is preferred over a Binary Search Tree (BST) for disk-based database indexes because of its design that minimizes the number of \"steps\" required to find data, which translates to reducing the number of I/O operations needed.\n\nIn contrast to BSTs where each node has at most two children and the height of the tree can be as high as `log₂(n)` (where n is the number of nodes), B+ Trees have large nodes that contain hundreds or thousands of keys and pointers. This design allows for a much shallower tree, even with billions of records.\n\nAs a result, when searching for data in a B+ Tree:\n\n*   Each step down the tree narrows the search space by a factor of hundreds (not just two), rather than halving it.\n*   The total height of the tree remains remarkably small compared to BSTs, which means fewer I/O operations are required.\n\nThis makes B+ Trees much more efficient for disk-based database indexes.",
+   "generationMs": 28176,
+   "label": "correct",
+   "borderline": false,
+   "wrongSentences": []
+  },
+  {
+   "id": "hash_range_queries#1",
+   "caseId": "hash_range_queries",
+   "split": "dev",
+   "seed": 1,
+   "question": "Why does a hash index struggle with range queries?",
+   "passageIds": [
+    "ch09.002",
+    "ch08.057",
+    "ch09.013",
+    "ch09.015"
+   ],
+   "answer": "A hash index struggles with range queries because it intentionally distributes keys evenly and avoids collisions, which means it obliterates the natural ordering of the data. This makes it impossible for the hash index to efficiently find all records whose keys fall within a continuous range.\n\nIn particular, when given a `lowerBound` and an `upperBound`, two keys that are neighbors in the original dataset (like employee ID 1000 and 1001) will be scattered to completely different locations in the index. As a result, the hash index must resort to a brute-force search to find all matching records, leading to O(N) performance for range queries.\n\nIn contrast, an ordered index like the B+ Tree can efficiently seek to the start of a range and scan only the relevant entries, allowing it to achieve O(log N + K) performance for range queries.",
+   "generationMs": 31828,
+   "label": "correct",
+   "borderline": false,
+   "wrongSentences": []
+  },
+  {
+   "id": "hash_range_queries#2",
+   "caseId": "hash_range_queries",
+   "split": "dev",
+   "seed": 2,
+   "question": "Why does a hash index struggle with range queries?",
+   "passageIds": [
+    "ch09.002",
+    "ch08.057",
+    "ch09.013",
+    "ch09.015"
+   ],
+   "answer": "A hash index struggles with range queries because it intentionally distributes keys evenly and avoids collisions, which means it loses its natural ordering of data. This makes it difficult to find all records whose keys fall within a continuous range, as the location of each key is unpredictable.\n\nIn contrast, an ordered index like the B+ Tree preserves the natural key order, allowing for efficient seeking to the start of a range and scanning only the relevant entries. As a result, the performance characteristics of hash indexes and ordered indexes differ significantly:\n\n*   Hash Index (Average Case):\n    *   **Point Query**: O(1) - fast lookup\n    *   **Range Query**: O(N) - slow scan of entire capacity\n    *   **Insertion**: O(1) - simple computation and array write\n\n*   Ordered Index (B+ Tree):\n    *   **Point Query**: O(log N) - slower traversal through tree-like structure\n    *   **Range Query**: O(log N + K) - efficient seeking to start of range and scanning matching items\n    *   **Insertion**: O(log N) - finding correct location and potentially restructuring the index\n\nThe trade-off between speed for point queries and efficiency for range queries is a fundamental challenge in database index design. While hash indexes excel at one type of query, they struggle with another, making it essential to choose an appropriate data structure based on the workload's characteristics.",
+   "generationMs": 43728,
+   "label": "correct",
+   "borderline": false,
+   "wrongSentences": []
+  },
+  {
+   "id": "hash_range_queries#3",
+   "caseId": "hash_range_queries",
+   "split": "dev",
+   "seed": 3,
+   "question": "Why does a hash index struggle with range queries?",
+   "passageIds": [
+    "ch09.002",
+    "ch08.057",
+    "ch09.013",
+    "ch09.015"
+   ],
+   "answer": "A hash index struggles with range queries because it intentionally distributes keys evenly and avoids collisions, which means it loses its natural ordering of data. This distribution makes it impossible to find all records whose keys fall within a continuous range in a single step.\n\nIn contrast, the ordered index (B+ Tree) preserves the key order, allowing for efficient seeking to the start of a range and scanning only relevant entries. The B+ Tree's structure enables fast range scans with an average time complexity of O(log N + K), whereas hash indexes have an average-case performance of O(N) for range queries.\n\nThe trade-off is that the hash index excels at point queries (O(1)) but sacrifices its ability to efficiently handle range queries. The ordered index, on the other hand, prioritizes efficient handling of range queries over point queries, making it a better choice when dealing with workloads containing moderate numbers of range queries.\n\nThe key reason for this struggle is that hash indexes are designed to distribute keys uniformly across their capacity, which prevents them from maintaining any inherent ordering. This uniform distribution makes it difficult for the index to quickly locate all records within a specific range without having to scan its entire capacity (O(N)).",
+   "generationMs": 26275,
+   "label": "correct",
+   "borderline": false,
+   "wrongSentences": []
+  },
+  {
+   "id": "bplus_sequence_set#1",
+   "caseId": "bplus_sequence_set",
+   "split": "dev",
+   "seed": 1,
+   "question": "Why does the B+ tree sequence set make range scans efficient?",
+   "passageIds": [
+    "ch09.021",
+    "ch09.030",
+    "ch09.033",
+    "ch09.102"
+   ],
+   "answer": "The B+ tree's linked list of leaves, known as the sequence set, makes range scans efficient because it allows for a horizontal scan at the leaf level rather than traversing up and down the internal nodes. This eliminates the need to repeatedly traverse the tree from the root node for each key in the query range.\n\nBy storing only separator keys (the `next` pointer) in the internal nodes, B+ trees can efficiently route queries to their corresponding leaves without having to store all data pointers. At the leaf level, this results in a linked list of consecutive records that can be traversed sequentially, making it possible for the database system to pre-fetch and read from multiple adjacent leaf nodes simultaneously.\n\nThis horizontal scan is particularly efficient because it takes advantage of sequential I/O patterns on disk-based storage systems. By anticipating which leaf nodes will be accessed next during the query, the database system can optimize its I/O operations and reduce the number of random accesses required.\n\nIn contrast, B-Tree range scans are inefficient due to their need for repeated traversals up and down the tree's internal nodes, resulting in more random I/O operations. The presence of a sequence set in B+ trees provides a key differentiator that enables fast and efficient range queries.",
+   "generationMs": 35476,
+   "label": "partly_wrong",
+   "borderline": false,
+   "wrongSentences": [
+    {
+     "id": 3,
+     "kind": "contradicted",
+     "why": "The next pointer links leaves (the sequence set); it is not the separator keys stored in internal nodes."
+    },
+    {
+     "id": 4,
+     "kind": "unsupported",
+     "why": "Passage says the system can pre-fetch next leaves, not read multiple leaves simultaneously.",
+     "borderline": true
+    }
+   ]
+  },
+  {
+   "id": "bplus_sequence_set#2",
+   "caseId": "bplus_sequence_set",
+   "split": "dev",
+   "seed": 2,
+   "question": "Why does the B+ tree sequence set make range scans efficient?",
+   "passageIds": [
+    "ch09.021",
+    "ch09.030",
+    "ch09.033",
+    "ch09.102"
+   ],
+   "answer": "The B+ tree's linked list of leaf nodes, known as the sequence set, makes range scans efficient because it allows for a horizontal traversal of the data without having to traverse up and down the internal nodes. This is in contrast to B-trees, which lack this feature.\n\nIn a B+ tree, each node stores only separator keys that route traffic between child nodes. The actual key-value pairs are stored exclusively in leaf nodes. When performing a range scan, the algorithm starts at the root node and traverses down to find the first leaf node containing the lower bound of the query range. Once this is found, it then scans horizontally through the linked list of keys in that leaf node.\n\nThe sequence set enables efficient scanning because:\n\n*   The data can be accessed sequentially without having to traverse up and down the tree for each key.\n*   Disk I/O patterns become largely sequential, which is an optimal way to read from storage devices.",
+   "generationMs": 28058,
+   "label": "correct",
+   "borderline": true,
+   "wrongSentences": [],
+   "note": "Sentence 3 says 'each node' stores only separator keys (true of internal nodes); sentence 6 says linked list of keys in a leaf (it is a list of leaves). Imprecise rather than wrong."
+  },
+  {
+   "id": "bplus_sequence_set#3",
+   "caseId": "bplus_sequence_set",
+   "split": "dev",
+   "seed": 3,
+   "question": "Why does the B+ tree sequence set make range scans efficient?",
+   "passageIds": [
+    "ch09.021",
+    "ch09.030",
+    "ch09.033",
+    "ch09.102"
+   ],
+   "answer": "The B+ tree's linked list of leaf nodes, known as the sequence set, makes range scans efficient because it allows for a horizontal traversal of the data without having to traverse up and down the internal nodes. This is in contrast to B-trees, which lack this feature.\n\nIn a B+ tree, each node stores only separator keys that route the search to child nodes. The actual key-value pairs are stored exclusively in leaf nodes. When performing a range scan, the algorithm can start at any leaf node and traverse horizontally through its `next` pointer until it reaches the end of the sequence set.\n\nThis horizontal traversal is efficient because:\n\n1.  **Pre-fetching**: By anticipating that the scan will continue beyond the current leaf node, disk-based systems can pre-fetch the next few leaf nodes, reducing I/O overhead.\n2.  **Sequential access pattern**: The linked list structure enables a sequential access pattern to the data, which is the most efficient way to read from any storage device.\n\nIn contrast, B-trees require traversing up and down the internal nodes for each key in the range, leading to an inefficient process that incurs more random I/O.",
+   "generationMs": 30940,
+   "label": "partly_wrong",
+   "borderline": false,
+   "wrongSentences": [
+    {
+     "id": 5,
+     "kind": "contradicted",
+     "why": "The range query first traverses the tree to the leaf holding the lower bound; it cannot start at any leaf."
+    }
+   ]
+  },
+  {
+   "id": "aggregation_grouping#1",
+   "caseId": "aggregation_grouping",
+   "split": "dev",
+   "seed": 1,
+   "question": "How does BuzzDB implement GROUP BY aggregation with a hash table?",
+   "passageIds": [
+    "ch13.022",
+    "ch13.028",
+    "ch13.052"
+   ],
+   "answer": "BuzzDB implements GROUP BY aggregation using an in-memory hash table. The central component of the `HashAggregationOperator`'s internal state is its hash table, which maps grouping keys to a vector of aggregate states.\n\nHere's how it works:\n\n1.  **Key Generation**: When processing each tuple from the input data, BuzzDB generates a key based on the specified group-by columns. This key serves as the index into the hash table.\n2.  **Hash Table Lookup and Initialization**:\n\n    *   If the generated key is not present in the hash table (`hash_table.count(group_keys)` returns false), it initializes aggregate values for this new group by creating a vector of fields with all elements set to zero (`std::vector<Field> aggr_values(aggr_funcs.size(), Field(0))`).\n    *   It then inserts the key and its corresponding initial aggregate state into the hash table.\n3.  **Aggregate State Update**:\n\n    *   For each requested aggregate function, it updates the current value in the `aggr_values` vector using a call to the `updateAggregate()` function (`aggr_values[i] = updateAggregate(aggr_funcs[i], aggr_values[i], *tuple[aggr_funcs[i].attr_index])`).\n4.  **Final Result Construction**: After processing all tuples for each group, BuzzDB constructs its final result by extracting and combining aggregate values from the hash table.\n\nBy using a hash table to store intermediate aggregate results, BuzzDB achieves efficient GROUP BY aggregation with linear time complexity (O(N)), assuming constant-time average lookups provided by the hash table.",
+   "generationMs": 44994,
+   "label": "correct",
+   "borderline": true,
+   "wrongSentences": [],
+   "note": "Sentence 8 (final result construction) is not shown in the passages but is generic."
+  },
+  {
+   "id": "aggregation_grouping#2",
+   "caseId": "aggregation_grouping",
+   "split": "dev",
+   "seed": 2,
+   "question": "How does BuzzDB implement GROUP BY aggregation with a hash table?",
+   "passageIds": [
+    "ch13.022",
+    "ch13.028",
+    "ch13.052"
+   ],
+   "answer": "BuzzDB implements GROUP BY aggregation using an in-memory hash table. The central component of the `HashAggregationOperator`'s internal state is its hash table, which maps grouping keys to a vector of aggregate states.\n\nHere's how it works:\n\n1.  **Key Generation**: When processing each tuple from the input data, BuzzDB generates a key based on the specified group-by columns by creating a `std::vector<Field>` representing these values.\n2.  **Hash Table Lookup and Initialization**:\n\n    *   If the generated key is not present in the hash table (`hash_table.count(group_keys)`), it initializes aggregate values for this new group by setting up an array of zeros with the same size as the number of requested aggregate functions (`aggr_funcs.size()`).\n    *   The initialized vector is then stored in the hash table under the generated key.\n3.  **Aggregate State Update**:\n\n    *   For each requested aggregate function, BuzzDB updates its corresponding value in the `aggr_values` array using a call to the `updateAggregate` function (`aggr_funcs[i]`, `aggr_values[i]`, and the current tuple's attribute).\n4.  **Final Result Computation**: After processing all tuples for a group, the final aggregate values are computed by summing up or counting the updated values in each array.\n\nBy using this approach with an in-memory hash table, BuzzDB achieves GROUP BY aggregation in linear time (O(N)) and efficiently handles arbitrary grouping keys and multiple aggregate functions within a single pass over the input data.",
+   "generationMs": 40808,
+   "label": "partly_wrong",
+   "borderline": false,
+   "wrongSentences": [
+    {
+     "id": 7,
+     "kind": "contradicted",
+     "why": "The hash table already holds running aggregates updated per tuple; there is no final summing or counting pass over the arrays."
+    }
+   ]
+  },
+  {
+   "id": "aggregation_grouping#3",
+   "caseId": "aggregation_grouping",
+   "split": "dev",
+   "seed": 3,
+   "question": "How does BuzzDB implement GROUP BY aggregation with a hash table?",
+   "passageIds": [
+    "ch13.022",
+    "ch13.028",
+    "ch13.052"
+   ],
+   "answer": "BuzzDB implements GROUP BY aggregation using an in-memory hash table. The central component of the `HashAggregationOperator`'s internal state is its hash table, which maps grouping keys to a vector of aggregate states.\n\nHere's how it works:\n\n1.  **Key Generation**: When processing each tuple from the input data, BuzzDB generates a key based on the specified group-by columns. This key serves as the index into the hash table.\n2.  **Hash Table Lookup and Initialization**:\n\n    *   If the generated key is not present in the hash table (`hash_table.count(group_keys)` returns false), it initializes aggregate values for this new group by creating a vector of `aggr_funcs.size()` fields with initial values set to zero, where each field corresponds to an aggregate function.\n    *   The newly created aggregate state is then stored as the value associated with the generated key in the hash table (`hash_table[group_keys] = aggr_values`).\n3.  **Aggregate State Update**:\n\n    *   For existing groups (i.e., those already present in the hash table), BuzzDB updates their corresponding aggregate states by calling `updateAggregate()` for each requested aggregate function.\n4.  **Aggregation Computation**: The final result is computed from the updated aggregate state of each group.\n\nBy using a hash table to store and update aggregate values, BuzzDB achieves efficient GROUP BY aggregation with linear time complexity (O(N)), assuming constant-time average lookups provided by the hash table implementation.",
+   "generationMs": 31137,
+   "label": "correct",
+   "borderline": false,
+   "wrongSentences": []
+  },
+  {
+   "id": "wal_write_ordering#1",
+   "caseId": "wal_write_ordering",
+   "split": "dev",
+   "seed": 1,
+   "question": "Why does write-ahead logging require write ordering control in the buffer manager?",
+   "passageIds": [
+    "ch05.016",
+    "ch06.096"
+   ],
+   "answer": "Write-ahead logging (WAL) requires strict write ordering control because log records describing a change must be written to persistent storage before the changed data pages themselves are written. This ensures that if the system crashes, the log can be used to redo or undo changes to bring the database back to a consistent state.\n\nThe buffer manager's role in enforcing this control is crucial. It \"pins\" dirty pages in memory and refuses to write them to disk until it confirms the corresponding log records have been flushed. This fine-grained control prevents the OS file cache from flushing dirty blocks to disk on its own schedule, which could reorder or delay writes.\n\nWithout strict write ordering control, relying solely on the OS's cache would make building a correct recovery manager nearly impossible. The database must be able to guarantee that log records are written before data pages, and only a custom buffer manager can provide this level of control.",
+   "generationMs": 30020,
+   "label": "correct",
+   "borderline": true,
+   "wrongSentences": [],
+   "note": "Sentence 5 says the buffer manager's control 'prevents the OS file cache from flushing'; the passage says the DBMS avoids relying on the OS cache. Imprecise."
+  },
+  {
+   "id": "wal_write_ordering#2",
+   "caseId": "wal_write_ordering",
+   "split": "dev",
+   "seed": 2,
+   "question": "Why does write-ahead logging require write ordering control in the buffer manager?",
+   "passageIds": [
+    "ch05.016",
+    "ch06.096"
+   ],
+   "answer": "Write-ahead logging (WAL) requires strict write ordering control because log records describing a change must be written to persistent storage before the changed data pages themselves are written. This ensures that if the system crashes, the log can be used to redo or undo changes to bring the database back to a consistent state.\n\nThe buffer manager enforces this by \"pinning\" dirty pages in memory and refusing to write them to disk until it confirms the corresponding log records have been flushed. The OS file cache provides no such fine-grained control, allowing for potential delays or reordering of writes that would compromise durability guarantees.\n\nIn other words, WAL relies on the buffer manager's ability to ensure a specific ordering between writes to different files (the log file and the database file), which is essential for guaranteeing crash recovery and restoring the database to a consistent state.",
+   "generationMs": 19098,
+   "label": "correct",
+   "borderline": false,
+   "wrongSentences": []
+  },
+  {
+   "id": "wal_write_ordering#3",
+   "caseId": "wal_write_ordering",
+   "split": "dev",
+   "seed": 3,
+   "question": "Why does write-ahead logging require write ordering control in the buffer manager?",
+   "passageIds": [
+    "ch05.016",
+    "ch06.096"
+   ],
+   "answer": "Write-ahead logging (WAL) requires strict write ordering control because log records describing a change must be written to persistent storage before the changed data pages themselves are written. This ensures that if the system crashes, the log can be used to redo or undo changes to bring the database back to a consistent state.\n\nIn other words, WAL relies on maintaining a causal relationship between writes to different parts of the database: all log records must precede their corresponding page updates in order to ensure data consistency. The operating system's cache provides no such guarantee, as it may delay or reorder writes for its own performance reasons, making it impossible to provide strict durability guarantees.\n\nBy enforcing write ordering control through a custom buffer manager, a DBMS can prevent these issues and maintain the integrity of the database, even in the event of a crash.",
+   "generationMs": 105883,
+   "label": "correct",
+   "borderline": false,
+   "wrongSentences": []
+  },
+  {
+   "id": "oltp_vs_olap#1",
+   "caseId": "oltp_vs_olap",
+   "split": "dev",
+   "seed": 1,
+   "question": "What is the difference between OLTP and OLAP workloads?",
+   "passageIds": [
+    "ch15.002",
+    "ch15.008",
+    "ch15.012"
+   ],
+   "answer": "OLTP (Online Transaction Processing) and OLAP (Online Analytical Processing) are two fundamental workload categories for database systems. The primary differences lie in their goals, performance requirements, data access patterns, and user expectations.\n\n**Primary Goal:**\n\n*   **OLTP:** Run the business; record and process daily operations.\n*   **OLAP:** Understand the business; support decision-making and reporting.\n\n**Workload Characteristics:**\n\n*   **OLTP:**\n    *   High volume of simple, repetitive transactions (read, insert, update).\n    *   Low complexity queries with few joins or aggregations.\n    *   Focus on low latency and high throughput for concurrent users.\n*   **OLAP:**\n    *   Low volume of complex, ad-hoc queries (scans, aggregations) that require significant processing power.\n    *   High data aggregation and analysis requirements.\n\n**Unit of Work and Data Scope:**\n\n*   **OLTP:** A single transaction, often touching a few rows. Focuses on current operational data.\n*   **OLAP:** A single large query, often touching millions of rows. Requires historical and aggregated data spanning years.\n\n**Users and Performance Metrics:**\n\n*   **OLTP:** End-users, clerks, automated systems (thousands of concurrent users). Emphasizes transactions per second (TPS) and low latency.\n*   **OLAP:** Business analysts, data scientists, executives (few concurrent users). Focuses on query response time and throughput of large queries.\n\n**Data Model:**\n\n*   **OLTP:** Highly normalized to ensure data integrity.\n*   **OLAP:** Denormalized (e.g., Star Schema) for simplified and faster querying.",
+   "generationMs": 47445,
+   "label": "partly_wrong",
+   "borderline": true,
+   "wrongSentences": [
+    {
+     "id": 6,
+     "kind": "unsupported",
+     "why": "Passages never mention joins; 'few joins or aggregations' is added."
+    }
+   ]
+  },
+  {
+   "id": "oltp_vs_olap#2",
+   "caseId": "oltp_vs_olap",
+   "split": "dev",
+   "seed": 2,
+   "question": "What is the difference between OLTP and OLAP workloads?",
+   "passageIds": [
+    "ch15.002",
+    "ch15.008",
+    "ch15.012"
+   ],
+   "answer": "OLTP (Online Transaction Processing) and OLAP (Online Analytical Processing) are two fundamental workload categories for database systems. The primary differences lie in their goals, access patterns, user expectations, performance metrics, and data models.\n\n**Primary Goal:**\n- **OLTP:** Run the business; record and process daily operations.\n- **OLAP:** Understand the business; support decision-making and reporting.\n\n**Workload Characteristics:**\n\n| Dimension | OLTP (Online Transaction Processing) | OLAP (Online Analytical Processing) |\n| --------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------ |\n| **Primary Goal** | Run the business; record and process daily operations | Understand the business; support decision-making and reporting |\n| **Workload** | High volume of simple, repetitive transactions (read, insert, update) | Low volume of complex, ad-hoc queries (scans, aggregations) |\n| **Unit of Work** | A single transaction, often touching a few rows | A single large query, often touching millions of rows |\n| **Data Scope** | Current, up-to-the-minute operational data | Historical and aggregated data, often spanning years |\n\nThese differences stem from the distinct user bases for each workload. OLTP systems are designed to handle thousands of concurrent users with simple transactions, whereas OLAP systems cater to a smaller number of users who require complex queries on large datasets.\n\n**Performance Metrics:**\n\n- **OLTP:** Transactions per second (TPS), low latency\n- **OLAP:** Query response time, throughput of large queries\n\nThe performance goals and user expectations for these workloads are also distinct. OLTP systems prioritize high transaction rates and low latency to support the business operations, whereas OLAP systems focus on query response times and the ability to handle complex analytics.\n\n**Data Models:**\n\n- **OLTP:** Highly normalized (e.g., 3NF) data models ensure data integrity but can lead to slower query performance.\n- **OLAP:** Denormalized data models (e.g., Star Schema) simplify queries at the cost of reduced data consistency and increased storage requirements.",
+   "generationMs": 43895,
+   "label": "partly_wrong",
+   "borderline": false,
+   "wrongSentences": [
+    {
+     "id": 5,
+     "kind": "unsupported",
+     "why": "Passages do not say the differences stem from the user bases."
+    },
+    {
+     "id": 11,
+     "kind": "unsupported",
+     "why": "Passages do not say normalization leads to slower queries."
+    },
+    {
+     "id": 12,
+     "kind": "unsupported",
+     "why": "Passages do not say denormalization reduces consistency or increases storage."
+    }
+   ]
+  },
+  {
+   "id": "oltp_vs_olap#3",
+   "caseId": "oltp_vs_olap",
+   "split": "dev",
+   "seed": 3,
+   "question": "What is the difference between OLTP and OLAP workloads?",
+   "passageIds": [
+    "ch15.002",
+    "ch15.008",
+    "ch15.012"
+   ],
+   "answer": "OLTP (Online Transaction Processing) and OLAP (Online Analytical Processing) are two fundamental workload categories for database systems. The primary differences lie in their goals, performance requirements, data access patterns, user expectations, and underlying architecture.\n\n**Key distinctions:**\n\n*   **Primary Goal**: \n    *   OLTP aims to run the business by recording and processing daily operations.\n    *   OLAP focuses on understanding the business through decision-making and reporting support.\n*   **Workload Characteristics**:\n    *   OLTP involves a high volume of simple, repetitive transactions (e.g., read, insert, update) with thousands of concurrent users.\n    *   OLAP requires low volumes of complex, ad-hoc queries (scans, aggregations) with few concurrent users.\n*   **Unit of Work**:\n    *   OLTP typically involves a single transaction touching a few rows.\n    *   OLAP often deals with large-scale queries that touch millions of rows.\n*   **Data Scope and Characteristics**:\n    *   OLTP operates on current, up-to-the-minute operational data.\n    *   OLAP works with historical and aggregated data spanning years or even decades.\n*   **Performance Metrics and Requirements**:\n    *   OLTP is optimized for transactions per second (TPS) and low latency to support high concurrency.\n    *   OLAP focuses on query response time, throughput of large queries, and performance under heavy analytical loads.\n\nThese differences in workload characteristics drive distinct database design approaches:\n\n*   **OLTP**: Typically employs highly normalized data models (e.g., 3NF) for data integrity and scalability.\n*   **OLAP**: Often uses denormalized data structures like the Star Schema to simplify queries and improve performance.",
+   "generationMs": 54214,
+   "label": "correct",
+   "borderline": true,
+   "wrongSentences": [],
+   "note": "Small additions: 'or even decades' (passage: years), 'and scalability' for normalization."
+  },
+  {
+   "id": "column_store_analytics#1",
+   "caseId": "column_store_analytics",
+   "split": "dev",
+   "seed": 1,
+   "question": "Why is a column store faster for analytical queries that read only a few columns?",
+   "passageIds": [
+    "ch15.021",
+    "ch15.032",
+    "ch15.039"
+   ],
+   "answer": "A column-oriented database organizes data on disk so that all values for a single attribute are stored together. This allows query performance to improve because it reduces the amount of I/O required.\n\nWhen you run an analytical query, such as calculating the total sales for a specific product category, it typically only needs access to two or three columns from a table with dozens of columns. In contrast, traditional row-oriented databases store all attributes for a single record together on disk, requiring the database to read and discard data that is not needed.\n\nBy storing values for each attribute separately, column stores can significantly reduce I/O required when reading only specific columns. This results in faster query performance because it minimizes unnecessary data transfer from disk into memory.",
+   "generationMs": 21211,
+   "label": "correct",
+   "borderline": false,
+   "wrongSentences": []
+  },
+  {
+   "id": "column_store_analytics#2",
+   "caseId": "column_store_analytics",
+   "split": "dev",
+   "seed": 2,
+   "question": "Why is a column store faster for analytical queries that read only a few columns?",
+   "passageIds": [
+    "ch15.021",
+    "ch15.032",
+    "ch15.039"
+   ],
+   "answer": "A column-oriented database organizes data on disk so that all values for a single attribute are stored together. This allows query performance to improve because it reduces the amount of I/O required.\n\nWhen you run an analytical query, such as calculating the total sales for a specific product category, only a few columns from the table need to be accessed. In contrast, if data were organized in rows (as is typical with row-oriented databases), reading just one or two column values would require reading all the other columns stored next to it on disk.\n\nBy storing columns together, queries can read only the specific columns they need, reducing I/O required and improving performance for analytical workloads.",
+   "generationMs": 12421,
+   "label": "correct",
+   "borderline": false,
+   "wrongSentences": []
+  },
+  {
+   "id": "column_store_analytics#3",
+   "caseId": "column_store_analytics",
+   "split": "dev",
+   "seed": 3,
+   "question": "Why is a column store faster for analytical queries that read only a few columns?",
+   "passageIds": [
+    "ch15.021",
+    "ch15.032",
+    "ch15.039"
+   ],
+   "answer": "A column-oriented database organizes data on disk so that all values for a single attribute are stored together. This allows query performance to improve because when reading a specific column value, the database can access it without having to also retrieve other columns in the same row.\n\nFor example, consider an analytical query like `SELECT SUM(aggregate_column) FROM table WHERE filter_column > threshold;`. In this case, only two out of eight columns are needed. A row-oriented store would require reading all 8 columns for each row that matches the filter condition because they're stored contiguously on disk.\n\nIn contrast, a column store can read just those specific two required columns without having to access other columns in the same rows. This reduces I/O (input/output) operations and leads to faster query performance.",
+   "generationMs": 25343,
+   "label": "partly_wrong",
+   "borderline": true,
+   "wrongSentences": [
+    {
+     "id": 5,
+     "kind": "contradicted",
+     "why": "A row store reads all columns of every row to evaluate the filter, not only of rows that match it."
+    }
+   ]
+  },
+  {
+   "id": "volcano_iterator_model_alias#1",
+   "caseId": "volcano_iterator_model_alias",
+   "split": "dev",
+   "seed": 1,
+   "question": "Why is the Volcano model inefficient for analytical queries?",
+   "passageIds": [
+    "ch15.074",
+    "ch15.080"
+   ],
+   "answer": "The Volcano model is inefficient for analytical queries because it incurs significant overhead due to virtual function calls and context switching. \n\nFor every single tuple processed, each operator in the query plan requires a `GetNext()` method call, which leads to constant jumping between different pieces of code. This causes two main issues:\n\n1.  **CPU Instruction Cache Misses**: The CPU's instruction cache is designed for sequential execution of instructions within a small range of data. However, with the Volcano model, each operator in the query plan requires its own separate context and function calls, leading to frequent misses in this cache.\n2.  **Branch Predictor Inefficiencies**: The constant switching between different code paths also affects the branch predictor's ability to accurately predict which path will be taken next. This results in more mispredictions than necessary, further reducing performance.\n\nAs a result of these inefficiencies, even though each tuple is processed individually, the overall system overhead becomes disproportionately high due to communication and context switching costs.",
+   "generationMs": 25677,
+   "label": "partly_wrong",
+   "borderline": false,
+   "wrongSentences": [
+    {
+     "id": 3,
+     "kind": "unsupported",
+     "why": "Passages say nothing about the instruction cache being designed for sequential execution within a small range of data."
+    }
+   ]
+  },
+  {
+   "id": "volcano_iterator_model_alias#2",
+   "caseId": "volcano_iterator_model_alias",
+   "split": "dev",
+   "seed": 2,
+   "question": "Why is the Volcano model inefficient for analytical queries?",
+   "passageIds": [
+    "ch15.074",
+    "ch15.080"
+   ],
+   "answer": "The Volcano model is inefficient for analytical queries because it involves processing one tuple at a time. This approach incurs significant overhead due to virtual function calls for each operator in the query plan, which leads to:\n\n*   Constant jumping between different pieces of code: The system has to constantly switch between operators, causing inefficiencies.\n*   CPU instruction cache and branch predictor issues: The Volcano model's sequential processing doesn't allow the CPU to utilize its most powerful features efficiently.\n\nIn essence, this one-tuple-at-a-time approach prevents the CPU from utilizing its full potential due to:\n\n*   Limited data processing at once\n*   Excessive communication and context switching overhead\n\nThis inefficiency results in a significant increase in query execution time for analytical queries that process millions or billions of rows.",
+   "generationMs": 14628,
+   "label": "correct",
+   "borderline": true,
+   "wrongSentences": [],
+   "note": "Sentence 3 attributes the problem to 'sequential processing' rather than one tuple at a time; imprecise."
+  },
+  {
+   "id": "volcano_iterator_model_alias#3",
+   "caseId": "volcano_iterator_model_alias",
+   "split": "dev",
+   "seed": 3,
+   "question": "Why is the Volcano model inefficient for analytical queries?",
+   "passageIds": [
+    "ch15.074",
+    "ch15.080"
+   ],
+   "answer": "The Volcano model is inefficient for analytical queries because it incurs significant overhead due to virtual function calls and context switching. \n\nFor every single tuple processed, each operator in the query plan (such as a filter or join) has a `GetNext()` method that must be called on its child, resulting in constant jumping between different pieces of code. This wreaks havoc on the CPU's instruction cache and branch predictor.\n\nAs a result, the system is unable to utilize its most powerful features, such as processing large amounts of data simultaneously, because it can only operate on tiny amounts of data at once. The overhead of communication and context switching dwarfs the actual work being done, making this approach profoundly inefficient for analytical queries that process millions or billions of rows.",
+   "generationMs": 22580,
+   "label": "correct",
+   "borderline": false,
+   "wrongSentences": []
+  },
+  {
+   "id": "declarative_what_not_how#1",
+   "caseId": "declarative_what_not_how",
+   "split": "dev",
+   "seed": 1,
+   "question": "What does it mean that a database query is declarative rather than procedural?",
+   "passageIds": [
+    "ch01.044",
+    "ch01.063",
+    "ch02.106"
+   ],
+   "answer": "A database query can be either **procedural** (how) or **declarative** (what). \n\nIn a procedural approach, the focus is on specifying exactly how to compute the result. This means describing not only what data is needed but also how it should be processed and transformed.\n\nOn the other hand, in a declarative approach, the focus shifts from \"how\" to \"what\". The query specifies only the desired outcome or properties of the result set without worrying about the exact steps required to achieve that outcome. This means describing not what data is needed but rather its logical structure and relationships.\n\nIn essence, procedural queries are like writing a recipe for making something (specifying how), whereas declarative queries are more like stating what you want as an end product (what).",
+   "generationMs": 20297,
+   "label": "partly_wrong",
+   "borderline": false,
+   "wrongSentences": [
+    {
+     "id": 6,
+     "kind": "contradicted",
+     "why": "A declarative query describes what result is wanted; the answer says it describes 'not what data is needed'."
+    }
+   ]
+  },
+  {
+   "id": "declarative_what_not_how#2",
+   "caseId": "declarative_what_not_how",
+   "split": "dev",
+   "seed": 2,
+   "question": "What does it mean that a database query is declarative rather than procedural?",
+   "passageIds": [
+    "ch01.044",
+    "ch01.063",
+    "ch02.106"
+   ],
+   "answer": "A database query can be either **procedural** (how) or **declarative** (what). \n\nIn a procedural approach, the focus is on specifying exactly how to compute the result. This means describing not only what data you want but also how it should be processed and transformed along the way.\n\nOn the other hand, in a declarative approach, the focus shifts from \"how\" to \"what\". You specify the desired outcome without worrying about the implementation details of achieving that outcome. The database system takes care of figuring out the best algorithm or steps necessary to produce the result.\n\nIn essence, procedural queries describe an **algorithm** for computing the data, whereas declarative queries describe a **logical property** of the desired output.",
+   "generationMs": 13361,
+   "label": "correct",
+   "borderline": false,
+   "wrongSentences": []
+  },
+  {
+   "id": "declarative_what_not_how#3",
+   "caseId": "declarative_what_not_how",
+   "split": "dev",
+   "seed": 3,
+   "question": "What does it mean that a database query is declarative rather than procedural?",
+   "passageIds": [
+    "ch01.044",
+    "ch01.063",
+    "ch02.106"
+   ],
+   "answer": "A database query can be either **procedural** (how) or **declarative** (what). \n\nIn a procedural approach, the focus is on specifying exactly how to compute the result. This involves writing detailed instructions for each step of the computation, including data structures and state management.\n\nOn the other hand, a declarative query focuses solely on describing what result is desired without specifying the exact steps required to achieve it. The database system then chooses an efficient algorithm to produce the desired output.\n\nIn summary, procedural queries are concerned with **how** to compute something, whereas declarative queries are about stating only **what** you want as a result.",
+   "generationMs": 19474,
+   "label": "correct",
+   "borderline": false,
+   "wrongSentences": []
+  },
+  {
+   "id": "why_index_duplicates_data#1",
+   "caseId": "why_index_duplicates_data",
+   "split": "dev",
+   "seed": 1,
+   "question": "Why does BuzzDB store its data in both the table and the index?",
+   "passageIds": [
+    "ch01.074",
+    "ch01.075",
+    "ch01.076",
+    "ch07.075"
+   ],
+   "answer": "BuzzDB stores its data in both the `table` and the `index` to achieve efficiency and scalability. The primary purpose of the `table` is as the main storage, serving as the system's source of truth for all data.\n\nThe `index`, on the other hand, serves a complementary role as an auxiliary structure designed to accelerate specific types of queries. It contains pre-sorted and pre-grouped versions of the data by key, allowing for faster query performance when searching or filtering data based on certain criteria.\n\nBy storing data in both structures, BuzzDB can achieve two main benefits:\n\n1.  **Efficient Data Insertion**: The `table` acts as a simple log where new data is efficiently added to the end without needing to rearrange existing data.\n2.  **Faster Query Performance**: The pre-organized index provides a shortcut for queries that require specific filtering or sorting, reducing the need to scan through large amounts of data.\n\nThis approach allows BuzzDB to sidestep the write penalty typically associated with maintaining an up-to-date index during data insertion and instead focuses on building its index on-demand after all data has been loaded.",
+   "generationMs": 33842,
+   "label": "partly_wrong",
+   "borderline": true,
+   "wrongSentences": [
+    {
+     "id": 7,
+     "kind": "contradicted",
+     "why": "Storing data in both structures costs twice the work per insert (ch01.076); sidestepping the write penalty comes from building the index on demand (ch07.075), not from the duplication.",
+     "borderline": true
+    }
+   ]
+  },
+  {
+   "id": "why_index_duplicates_data#2",
+   "caseId": "why_index_duplicates_data",
+   "split": "dev",
+   "seed": 2,
+   "question": "Why does BuzzDB store its data in both the table and the index?",
+   "passageIds": [
+    "ch01.074",
+    "ch01.075",
+    "ch01.076",
+    "ch07.075"
+   ],
+   "answer": "BuzzDB stores its data in both the `table` and the `index` to achieve efficiency and support specific types of queries. The primary purpose of the `table` vector is as the main storage, containing all information sequentially inserted into it.\n\nThe `index`, on the other hand, serves an auxiliary role by providing a pre-organized copy of some data designed to accelerate certain query operations. This organization comes at a cost; every insertion operation now does twice the work: writing to both the primary storage (`table`) and updating the index structure.\n\nThis strategy allows BuzzDB to sidestep the write penalty associated with maintaining an always-perfectly synchronized index during data modification, as it builds its index on-demand after all data has been loaded. The trade-off is a small upfront cost for each insertion operation but provides significant benefits when querying the data.",
+   "generationMs": 16775,
+   "label": "partly_wrong",
+   "borderline": true,
+   "wrongSentences": [
+    {
+     "id": 5,
+     "kind": "contradicted",
+     "why": "Says the duplication strategy sidesteps the write penalty right after saying each insert does twice the work; on-demand indexing is a different design (ch07.075).",
+     "borderline": true
+    }
+   ]
+  },
+  {
+   "id": "why_index_duplicates_data#3",
+   "caseId": "why_index_duplicates_data",
+   "split": "dev",
+   "seed": 3,
+   "question": "Why does BuzzDB store its data in both the table and the index?",
+   "passageIds": [
+    "ch01.074",
+    "ch01.075",
+    "ch01.076",
+    "ch07.075"
+   ],
+   "answer": "BuzzDB stores its data in both the `table` and the `index` to achieve efficiency through a strategy known as \"on-demand indexing.\" The primary purpose of this approach is to accelerate specific types of queries.\n\nThe `table` vector serves as the main storage, containing all the information. It acts like a simple log or heap file where new data is efficiently added to the end without needing to rearrange existing data.\n\nOn the other hand, the `index` map provides an auxiliary structure that accelerates certain query types by pre-sorting and pre-grouping data based on keys. The line `index[key].push_back(value)` creates a new entry in the index if the key is new or appends the value to the existing vector associated with the key.\n\nThis organization comes at a cost, as each insertion operation now does twice the work: writing to both the table and the index. However, this upfront investment yields significant returns when it's time to ask questions of the data, making BuzzDB an efficient choice for certain types of queries.",
+   "generationMs": 33161,
+   "label": "partly_wrong",
+   "borderline": true,
+   "wrongSentences": [
+    {
+     "id": 1,
+     "kind": "contradicted",
+     "why": "The passages give the reason as source of truth plus an auxiliary index for fast queries; 'on-demand indexing' is a later, different BuzzDB design.",
+     "borderline": true
+    }
+   ]
+  },
+  {
+   "id": "durability_in_memory#1",
+   "caseId": "durability_in_memory",
+   "split": "dev",
+   "seed": 1,
+   "question": "What is durability, and why doesn't BuzzDB provide it?",
+   "passageIds": [
+    "ch01.095",
+    "ch04.089"
+   ],
+   "answer": "Durability refers to the ability of a database management system (DBMS) to ensure that once an operation or set of operations has been committed, the resulting data will survive any subsequent system failure. In other words, a durable DBMS guarantees that even if the system crashes or is shut down abruptly, the data will remain intact.\n\nBuzzDB does not provide durability because it stores its entire state in memory, rather than writing data to persistent storage like a solid-state drive or hard disk. This means that when BuzzDB exits or the server is rebooted for maintenance, all of its data is lost forever. The text unit highlights this as a catastrophic failure for a real business.\n\nThe reason durability is important is that it ensures the reliability and consistency of database operations. Without durability, there's no guarantee that changes made to the database will be preserved even if the system fails or crashes. This can lead to data loss and inconsistencies in the database.\n\nIn contrast, flushing a page (as shown in the second source unit) involves writing an in-memory page back to disk, making its contents permanent. While this is related to durability, it's more about ensuring that changes are made persistent rather than guaranteeing their survival after a system failure.",
+   "generationMs": 27937,
+   "label": "correct",
+   "borderline": true,
+   "wrongSentences": [],
+   "note": "Sentence 10 claims flushing is not about surviving failures; muddled but defensible."
+  },
+  {
+   "id": "durability_in_memory#2",
+   "caseId": "durability_in_memory",
+   "split": "dev",
+   "seed": 2,
+   "question": "What is durability, and why doesn't BuzzDB provide it?",
+   "passageIds": [
+    "ch01.095",
+    "ch04.089"
+   ],
+   "answer": "Durability refers to the ability of a database management system (DBMS) to ensure that once an operation or set of operations has been committed, the resulting data will survive any subsequent system failure. In other words, a durable DBMS guarantees that the data is written to persistent storage in such a way that it can be recovered even if the system crashes.\n\nBuzzDB does not provide durability because it stores its entire state in memory and does not write data to persistent storage. This means that when the program exits or the server is rebooted, all changes made by the user are lost forever. text, this is a catastrophic failure for a real business.",
+   "generationMs": 12128,
+   "label": "correct",
+   "borderline": false,
+   "wrongSentences": []
+  },
+  {
+   "id": "durability_in_memory#3",
+   "caseId": "durability_in_memory",
+   "split": "dev",
+   "seed": 3,
+   "question": "What is durability, and why doesn't BuzzDB provide it?",
+   "passageIds": [
+    "ch01.095",
+    "ch04.089"
+   ],
+   "answer": "Durability refers to the ability of a database management system (DBMS) to ensure that once an operation or set of operations has been committed, the resulting data will survive any subsequent system failure. In other words, a durable DBMS guarantees that even if the system crashes or is shut down abruptly, the data remains consistent and can be recovered.\n\nBuzzDB does not provide durability because it stores its entire state in memory (RAM), rather than writing data to persistent storage like a hard disk or solid-state drive. This means that when BuzzDB exits or the server is rebooted, all of its data is lost forever, as mentioned in the provided source text. Since BuzzDB relies solely on main memory for storing its `table` and `index`, it does not meet the core promise of durability.\n\nThe lack of durability in BuzzDB arises from a design choice that prioritizes simplicity over persistence. By keeping all state in RAM, BuzzDB avoids the overhead of writing data to disk, but this comes at the cost of losing data upon system failure or reboot.",
+   "generationMs": 26541,
+   "label": "partly_wrong",
+   "borderline": true,
+   "wrongSentences": [
+    {
+     "id": 6,
+     "kind": "unsupported",
+     "why": "Passages give no reason for BuzzDB's design such as prioritizing simplicity."
+    },
+    {
+     "id": 7,
+     "kind": "unsupported",
+     "why": "Passages do not say BuzzDB keeps state in RAM to avoid disk-write overhead."
+    }
+   ]
+  },
+  {
+   "id": "field_self_describing#1",
+   "caseId": "field_self_describing",
+   "split": "dev",
+   "seed": 1,
+   "question": "What makes a Field in BuzzDB self-describing?",
+   "passageIds": [
+    "ch02.025",
+    "ch02.026",
+    "ch02.027",
+    "ch04.064"
+   ],
+   "answer": "A `Field` in BuzzDB is self-describing because it holds both its value and a description (or \"tag\") that identifies the type of data stored in the field. This tag, represented by the `FieldType` enum, allows the database engine to interpret the raw data correctly when needed.\n\nIn other words, the presence of this descriptive information (\"what\") makes the bytes stored in the `Field` meaningful and interpretable without additional context or metadata.",
+   "generationMs": 17642,
+   "label": "correct",
+   "borderline": false,
+   "wrongSentences": []
+  },
+  {
+   "id": "field_self_describing#2",
+   "caseId": "field_self_describing",
+   "split": "dev",
+   "seed": 2,
+   "question": "What makes a Field in BuzzDB self-describing?",
+   "passageIds": [
+    "ch02.025",
+    "ch02.026",
+    "ch02.027",
+    "ch04.064"
+   ],
+   "answer": "A `Field` in BuzzDB is self-describing because it holds both its value and a description (or \"tag\") that identifies the type of data stored. The `FieldType` enum serves as this tag, allowing the database engine to interpret the raw bytes stored in the `data` member variable according to the specified type.\n\nThis design enables the `Field` class to be self-contained and flexible, making it easy for the system catalog (or metadata) to understand how to handle different types of data without having its schema baked into every record.",
+   "generationMs": 11188,
+   "label": "partly_wrong",
+   "borderline": false,
+   "wrongSentences": [
+    {
+     "id": 3,
+     "kind": "contradicted",
+     "why": "Self-describing fields embed type information in every record; the system catalog is the alternative that stores the schema once per table, not something Fields help."
+    }
+   ]
+  },
+  {
+   "id": "field_self_describing#3",
+   "caseId": "field_self_describing",
+   "split": "dev",
+   "seed": 3,
+   "question": "What makes a Field in BuzzDB self-describing?",
+   "passageIds": [
+    "ch02.025",
+    "ch02.026",
+    "ch02.027",
+    "ch04.064"
+   ],
+   "answer": "A `Field` in BuzzDB is self-describing because it holds both its value and a description (or \"tag\") that identifies the type of data stored. The `FieldType` enum serves as this tag, allowing the database engine to interpret the raw bytes stored in the `data` member variable according to the specified type.\n\nThis design enables the `Field` class to be self-contained and flexible, making it easy for the system catalog (or metadata) to understand how to handle different types of data without having its schema baked into every record.",
+   "generationMs": 22181,
+   "label": "partly_wrong",
+   "borderline": false,
+   "wrongSentences": [
+    {
+     "id": 3,
+     "kind": "contradicted",
+     "why": "Self-describing fields embed type information in every record; the system catalog is the alternative that stores the schema once per table, not something Fields help."
+    }
+   ]
+  },
+  {
+   "id": "page_size_tradeoff#1",
+   "caseId": "page_size_tradeoff",
+   "split": "dev",
+   "seed": 1,
+   "question": "How should a database choose between larger and smaller page sizes?",
+   "passageIds": [
+    "ch02.056",
+    "ch03.031"
+   ],
+   "answer": "When choosing between larger and smaller page sizes for a database, the decision depends on the workload characteristics of the queries being executed. \n\n**Larger pages (e.g., 16 KB)** are better suited for \"scan-heavy\" workloads where sequential access to large amounts of data is common. This choice can significantly reduce I/O throughput costs by minimizing the number of page reads required.\n\nOn the other hand, **smaller pages (e.g., 4 KB or 8 KB)** may be more efficient for \"lookup-heavy\" workloads with frequent small tuple accesses. Smaller pages minimize memory and network bandwidth waste when only a single record is accessed at a time.\n\nThe choice between larger and smaller page sizes depends on the specific characteristics of the workload, including:\n\n*   The frequency and size of sequential scans versus individual tuple lookups.\n*   The available I/O throughput and its relative cost compared to memory and network bandwidth usage.",
+   "generationMs": 22226,
+   "label": "correct",
+   "borderline": false,
+   "wrongSentences": []
+  },
+  {
+   "id": "page_size_tradeoff#2",
+   "caseId": "page_size_tradeoff",
+   "split": "dev",
+   "seed": 2,
+   "question": "How should a database choose between larger and smaller page sizes?",
+   "passageIds": [
+    "ch02.056",
+    "ch03.031"
+   ],
+   "answer": "To determine whether to use larger or smaller page sizes, the choice depends on the workload characteristics of the queries being executed. \n\n**Larger pages (e.g., 16 KB)** are suitable for \"scan-heavy\" workloads where many consecutive tuples need to be read. This is because reading a larger page yields more data and reduces the number of I/O operations required.\n\nOn the other hand, **smaller pages (e.g., 4 KB or 8 KB)** can be beneficial for \"lookup-heavy\" workloads with infrequent access to large amounts of data. Smaller pages minimize memory waste by allowing only a single tuple at a time to be stored in each page.\n\nThe choice between larger and smaller page sizes depends on the specific characteristics of the workload, such as:\n\n*   The frequency and size of queries\n*   The amount of data being accessed\n\nBy choosing an optimal page size that balances these factors, databases can minimize I/O operations while maximizing storage efficiency.",
+   "generationMs": 17181,
+   "label": "partly_wrong",
+   "borderline": false,
+   "wrongSentences": [
+    {
+     "id": 5,
+     "kind": "contradicted",
+     "why": "Small pages do not store only a single tuple each; they waste less when a query needs one small tuple."
+    },
+    {
+     "id": 4,
+     "kind": "contradicted",
+     "why": "Lookup-heavy workloads access a single small tuple at a time, not 'infrequent access to large amounts of data'.",
+     "borderline": true
+    }
+   ]
+  },
+  {
+   "id": "page_size_tradeoff#3",
+   "caseId": "page_size_tradeoff",
+   "split": "dev",
+   "seed": 3,
+   "question": "How should a database choose between larger and smaller page sizes?",
+   "passageIds": [
+    "ch02.056",
+    "ch03.031"
+   ],
+   "answer": "To determine whether to use larger or smaller page sizes, the choice depends on the type of workload that the database will primarily handle.\n\n**Larger pages (e.g., 16 KB)** are suitable for \"scan-heavy\" workloads where queries need to read many consecutive tuples. This is because reading a larger page can be more efficient than reading multiple smaller pages, as it reduces the number of I/O operations required and minimizes memory waste.\n\nOn the other hand, **smaller pages** (e.g., 4 KB) are better suited for \"lookup-heavy\" workloads where queries access only small amounts of data. Smaller pages reduce memory usage, network bandwidth consumption, and I/O throughput overhead associated with reading large pages that contain mostly empty space.\n\nWhen choosing between larger and smaller page sizes, the database system should consider its expected workload characteristics:\n\n*   Scan-heavy workloads: Larger pages (e.g., 16 KB) are likely a better choice.\n*   Lookup-heavy workloads: Smaller pages (e.g., 4 KB) might be more suitable.\n\nUltimately, the optimal page size depends on the specific requirements and trade-offs of each workload.",
+   "generationMs": 28241,
+   "label": "partly_wrong",
+   "borderline": false,
+   "wrongSentences": [
+    {
+     "id": 3,
+     "kind": "contradicted",
+     "why": "Memory waste is a drawback of large pages, not something they minimize."
+    },
+    {
+     "id": 5,
+     "kind": "contradicted",
+     "why": "The waste comes from reading a large page for one small record, not from pages that are mostly empty space."
+    }
+   ]
+  },
+  {
+   "id": "three_schema_levels#1",
+   "caseId": "three_schema_levels",
+   "split": "dev",
+   "seed": 1,
+   "question": "What are the three levels of abstraction in a database system?",
+   "passageIds": [
+    "ch02.105",
+    "ch02.106",
+    "ch02.107",
+    "ch01.061"
+   ],
+   "answer": "The three levels of abstraction in a database system are:\n\n1.  **Physical Level:** This is the lowest level and describes *how* data is stored, including files, byte ordering, record layouts on disk pages, and data structures used to manage storage.\n2.  **Logical Level:** This sits above the physical level and describes *what* data is stored in the database, presenting it in terms of a well-defined data model (e.g., relational model, graph model, or document model). It abstracts away file pointers and byte layouts.\n3.  **View Level (or Conceptual Level):** This is the highest level of abstraction, describing only part of the entire database tailored to specific user needs or applications.\n\nThese levels provide different views of data storage and retrieval, allowing for a more efficient and scalable approach to managing databases.",
+   "generationMs": 24722,
+   "label": "correct",
+   "borderline": true,
+   "wrongSentences": [],
+   "note": "Sentence 5 adds 'more efficient and scalable', not in the passages; generic."
+  },
+  {
+   "id": "three_schema_levels#2",
+   "caseId": "three_schema_levels",
+   "split": "dev",
+   "seed": 2,
+   "question": "What are the three levels of abstraction in a database system?",
+   "passageIds": [
+    "ch02.105",
+    "ch02.106",
+    "ch02.107",
+    "ch01.061"
+   ],
+   "answer": "The three levels of abstraction in a database system are described by the physical level, logical level, and view (or conceptual) level.\n\n*   The **physical level** describes how data is actually stored. It deals with files, byte ordering, record layouts on a disk page, and the data structures used to manage storage.\n*   The **logical level** sits above the physical level and describes what data is stored in the database and what relationships exist among that data. This level abstracts away the messy details of file pointers and byte layouts, presenting the data in terms of a well-defined data model.\n*   The **view (or conceptual) level** is the highest level of abstraction, which describes only a part of the entire database tailored to the needs of a specific user or application. This level provides security by hiding sensitive data and simplifies interaction by presenting a customized version of the database.\n\nThese three levels provide different views of the same underlying system, allowing developers to work at varying levels of complexity depending on their needs.",
+   "generationMs": 19718,
+   "label": "correct",
+   "borderline": false,
+   "wrongSentences": []
+  },
+  {
+   "id": "three_schema_levels#3",
+   "caseId": "three_schema_levels",
+   "split": "dev",
+   "seed": 3,
+   "question": "What are the three levels of abstraction in a database system?",
+   "passageIds": [
+    "ch02.105",
+    "ch02.106",
+    "ch02.107",
+    "ch01.061"
+   ],
+   "answer": "The three levels of abstraction in a database system are:\n\n1.  **Physical Level:** This is the lowest level and describes *how* data is stored, including files, byte ordering, record layouts on disk pages, and data structures used to manage storage.\n2.  **Logical Level:** This sits above the physical level and describes *what* data is stored in the database, presenting it in terms of a well-defined data model (e.g., relational model, graph model, or document model). It abstracts away file pointers and byte layouts.\n3.  **View Level (or Conceptual Level):** This is the highest level of abstraction, describing only part of the entire database tailored to specific user needs.",
+   "generationMs": 21751,
+   "label": "correct",
+   "borderline": false,
+   "wrongSentences": []
+  },
+  {
+   "id": "disk_access_time#1",
+   "caseId": "disk_access_time",
+   "split": "dev",
+   "seed": 1,
+   "question": "What makes up the time it takes to read a random page from a hard disk?",
+   "passageIds": [
+    "ch03.083",
+    "ch03.084",
+    "ch02.055"
+   ],
+   "answer": "The total time to read a single, randomly located page from disk is made up of three components:\n\n1.  **Seek Time**: The mechanical movement required for the actuator arm to physically move the read/write head from its current position to the correct circular track on the platter.\n2.  **Rotational Latency (or Rotational Delay)**: The time it takes for the platter to spin around until the desired data block is directly underneath the read/write head, which can take half a revolution at an average of about 4.15ms for a disk spinning at 7,200 RPM.\n3.  **Transfer Time**: The electronic process of reading from the magnetic surface and transferring the data to memory, typically measured in megabytes per second (MB/s).",
+   "generationMs": 28248,
+   "label": "correct",
+   "borderline": false,
+   "wrongSentences": []
+  },
+  {
+   "id": "disk_access_time#2",
+   "caseId": "disk_access_time",
+   "split": "dev",
+   "seed": 2,
+   "question": "What makes up the time it takes to read a random page from a hard disk?",
+   "passageIds": [
+    "ch03.083",
+    "ch03.084",
+    "ch02.055"
+   ],
+   "answer": "The total time to read a single, randomly located page from disk is broken down into three components:\n\n1.  **Seek Time**: The mechanical movement of the actuator arm to physically move the read/write head from its current position to the correct circular track on the platter.\n2.  **Rotational Latency (or Rotational Delay)**: The time it takes for the platter to spin around until the desired data block is directly underneath the read/write head, with an average rotational latency of about 4.15ms for a disk spinning at 7,200 RPM.\n3.  **Transfer Time**: The electronic process of reading from the magnetic surface and transferring the data to the system's memory.\n\nThese three components sum up to give the total time it takes to read a random page from a hard disk.",
+   "generationMs": 16290,
+   "label": "correct",
+   "borderline": false,
+   "wrongSentences": []
+  },
+  {
+   "id": "disk_access_time#3",
+   "caseId": "disk_access_time",
+   "split": "dev",
+   "seed": 3,
+   "question": "What makes up the time it takes to read a random page from a hard disk?",
+   "passageIds": [
+    "ch03.083",
+    "ch03.084",
+    "ch02.055"
+   ],
+   "answer": "The total time to read a single, randomly located page from disk is made up of three components:\n\n1.  **Seek Time**: The mechanical movement required for the actuator arm to physically move the read/write head from its current position to the correct circular track on the platter.\n2.  **Rotational Latency (or Rotational Delay)**: The time it takes for the platter to spin around until the desired data block is directly underneath the read/write head, which averages around half a revolution at 7,200 RPM.\n3.  **Transfer Time**: The electronic process of reading from the magnetic surface and transferring the data to memory, typically measured in megabytes per second (MB/s).",
+   "generationMs": 27835,
+   "label": "correct",
+   "borderline": false,
+   "wrongSentences": []
+  },
+  {
+   "id": "random_vs_sequential_io#1",
+   "caseId": "random_vs_sequential_io",
+   "split": "dev",
+   "seed": 1,
+   "question": "Why is sequential I/O so much faster than random I/O?",
+   "passageIds": [
+    "ch03.087",
+    "ch03.088",
+    "ch07.005"
+   ],
+   "answer": "Sequential I/O is significantly faster than random I/O because it minimizes the number of seek operations required to access data on disk. \n\nWhen accessing pages sequentially, the disk head only needs to move once to reach the first page and then stays put to read the remaining consecutive pages. In contrast, for random I/O, the disk must perform a separate seek operation for each accessed page, resulting in additional rotational delay.\n\nThe key insight here is that sequential access allows the disk head to \"stay on track\" (literally), reducing the overhead associated with seeking and rotating to different locations on the disk. This results in substantial performance improvements when dealing with large amounts of contiguous data.",
+   "generationMs": 18517,
+   "label": "correct",
+   "borderline": false,
+   "wrongSentences": []
+  },
+  {
+   "id": "random_vs_sequential_io#2",
+   "caseId": "random_vs_sequential_io",
+   "split": "dev",
+   "seed": 2,
+   "question": "Why is sequential I/O so much faster than random I/O?",
+   "passageIds": [
+    "ch03.087",
+    "ch03.088",
+    "ch07.005"
+   ],
+   "answer": "Sequential I/O is significantly faster than random I/O because it minimizes the number of seek operations required to access data on disk. \n\nWhen accessing pages sequentially, the disk head only needs to move once to reach the first page and then stays put to read the remaining consecutive pages. In contrast, for random I/O, the disk must perform a separate seek operation for each page accessed at different locations.\n\nThis difference in seek operations directly impacts the overall cost of reading data from disk. The fewer seek operations required, the lower the total time spent on I/O operations. As a result, sequential I/O is roughly 100 times faster than random I/O when accessing multiple pages scattered across different locations on the disk.",
+   "generationMs": 13164,
+   "label": "partly_wrong",
+   "borderline": false,
+   "wrongSentences": [
+    {
+     "id": 6,
+     "kind": "unsupported",
+     "why": "Passage says 100 random reads cost about 100 single random I/Os; it never says sequential I/O is 100 times faster."
+    }
+   ]
+  },
+  {
+   "id": "random_vs_sequential_io#3",
+   "caseId": "random_vs_sequential_io",
+   "split": "dev",
+   "seed": 3,
+   "question": "Why is sequential I/O so much faster than random I/O?",
+   "passageIds": [
+    "ch03.087",
+    "ch03.088",
+    "ch07.005"
+   ],
+   "answer": "Sequential I/O is significantly faster than random I/O because it minimizes the number of seek operations required to access data on disk. \n\nWhen accessing pages sequentially, the disk head only needs to move once to reach the first page and then stays put for the remaining sequential accesses. In contrast, with random I/O, the disk must perform a separate seek operation for each page accessed at different locations.\n\nThe reason behind this difference lies in how disks are physically organized: tracks on which data is stored are contiguous, allowing efficient sequential access. The rotational delay associated with seeking to an arbitrary location can be avoided by accessing pages sequentially, reducing overall I/O time.",
+   "generationMs": 19093,
+   "label": "correct",
+   "borderline": true,
+   "wrongSentences": [],
+   "note": "Sentence 4 ('tracks are contiguous') garbles 'pages stored contiguously on the same track'."
+  },
+  {
+   "id": "slotted_page_layout#1",
+   "caseId": "slotted_page_layout",
+   "split": "dev",
+   "seed": 1,
+   "question": "How is a slotted page laid out?",
+   "passageIds": [
+    "ch04.023",
+    "ch04.024",
+    "ch03.024"
+   ],
+   "answer": "A slotted page consists of three distinct regions:\n\n1.  **Header**: This region contains metadata.\n2.  **Slot Directory (or Slot Array)**: It acts as an index for the records on the page, arranged at the beginning and growing forward.\n3.  **Data Area**: The actual record bytes are stored here, placed at the end of the page and growing backward.\n\nThe layout is designed to manage free space efficiently:\n\n```\n Page Start Page End\n +---------------------------------------------------------------------+\n | Header | Slot Array --> | <-- Free Space --> | <-- Record Data |\n +---------------------------------------------------------------------+\n```",
+   "generationMs": 17578,
+   "label": "correct",
+   "borderline": false,
+   "wrongSentences": []
+  },
+  {
+   "id": "slotted_page_layout#2",
+   "caseId": "slotted_page_layout",
+   "split": "dev",
+   "seed": 2,
+   "question": "How is a slotted page laid out?",
+   "passageIds": [
+    "ch04.023",
+    "ch04.024",
+    "ch03.024"
+   ],
+   "answer": "A slotted page consists of three distinct regions:\n\n1.  **Header**: Contains metadata.\n2.  **Slot Directory (or Slot Array)**: Acts as an index for the records on the page, placed at the beginning and growing forward.\n3.  **Data Area**: Stores actual record bytes, located at the end of the page and growing backward.\n\nThe layout is designed to manage free space efficiently:\n\n```\n Page Start Page End\n +---------------------------------------------------------------------+\n | Header | Slot Array --> | <-- Free Space --> | <-- Record Data |\n +---------------------------------------------------------------------+\n```",
+   "generationMs": 10420,
+   "label": "correct",
+   "borderline": false,
+   "wrongSentences": []
+  },
+  {
+   "id": "slotted_page_layout#3",
+   "caseId": "slotted_page_layout",
+   "split": "dev",
+   "seed": 3,
+   "question": "How is a slotted page laid out?",
+   "passageIds": [
+    "ch04.023",
+    "ch04.024",
+    "ch03.024"
+   ],
+   "answer": "A slotted page consists of three distinct regions:\n\n1.  **Header**: Contains metadata.\n2.  **Slot Directory (or Slot Array)**: Acts as an index for the records on the page, placed at the beginning and growing forward.\n3.  **Data Area**: Stores actual record bytes, located at the end of the page and growing backward.\n\nThe canonical layout arranges these components to manage free space efficiently:\n\n```\n Page Start Page End\n +---------------------------------------------------------------------+\n | Header | Slot Array --> | <-- Free Space --> | <-- Record Data |\n +---------------------------------------------------------------------+\n```",
+   "generationMs": 17660,
+   "label": "correct",
+   "borderline": false,
+   "wrongSentences": []
+  },
+  {
+   "id": "slotted_delete_fragmentation#1",
+   "caseId": "slotted_delete_fragmentation",
+   "split": "dev",
+   "seed": 1,
+   "question": "What happens when a record is deleted from a slotted page?",
+   "passageIds": [
+    "ch04.040",
+    "ch04.041",
+    "ch07.072"
+   ],
+   "answer": "When a record is deleted from a slotted page, it does not move or rewrite any data. Instead, the method simply finds the corresponding slot and flips its `empty` flag from `false` to `true`. This operation modifies only a single bit in the page's metadata region.\n\nThe physical location of the record remains unchanged; however, the slot directory now marks them as garbage.",
+   "generationMs": 14241,
+   "label": "correct",
+   "borderline": false,
+   "wrongSentences": []
+  },
+  {
+   "id": "slotted_delete_fragmentation#2",
+   "caseId": "slotted_delete_fragmentation",
+   "split": "dev",
+   "seed": 2,
+   "question": "What happens when a record is deleted from a slotted page?",
+   "passageIds": [
+    "ch04.040",
+    "ch04.041",
+    "ch07.072"
+   ],
+   "answer": "When a record is deleted from a slotted page, it does not physically move or delete the data itself. Instead, the `empty` flag in the corresponding slot directory is simply flipped from `false` to `true`. This operation modifies only a single bit in the page's metadata region.\n\nAs a result of this change, there is no physical deletion of data; however, an unused space within the allocated bounds of a page becomes available.",
+   "generationMs": 8080,
+   "label": "correct",
+   "borderline": true,
+   "wrongSentences": [],
+   "note": "Sentence 4 says unused space 'becomes available'; the passage calls it a hole (internal fragmentation), not reusable free space."
+  },
+  {
+   "id": "slotted_delete_fragmentation#3",
+   "caseId": "slotted_delete_fragmentation",
+   "split": "dev",
+   "seed": 3,
+   "question": "What happens when a record is deleted from a slotted page?",
+   "passageIds": [
+    "ch04.040",
+    "ch04.041",
+    "ch07.072"
+   ],
+   "answer": "When a record is deleted from a slotted page, it does not move or rewrite any data. Instead, the method simply finds the corresponding slot and flips its `empty` flag from `false` to `true`. This operation modifies only a single bit in the page's metadata region.\n\nAs a result of this operation, there is no actual movement of data on disk; however, an unused space within the allocated bounds of a page becomes available.",
+   "generationMs": 16276,
+   "label": "correct",
+   "borderline": true,
+   "wrongSentences": [],
+   "note": "Same as #2, sentence 4."
+  },
+  {
+   "id": "record_id_stability#1",
+   "caseId": "record_id_stability",
+   "split": "dev",
+   "seed": 1,
+   "question": "Why do indexes refer to records by record ID instead of by byte offset?",
+   "passageIds": [
+    "ch04.044",
+    "ch04.045",
+    "ch04.047",
+    "ch07.023"
+   ],
+   "answer": "Indexes in a database like BuzzDB should refer to records using their **Record ID (RID)** rather than just the byte offset. This is because, as explained earlier, databases sometimes need to reorganize pages during compaction, which would change the byte offsets and invalidate any external pointers.\n\nBy storing RIDs instead of direct file offsets, indexes can maintain a stable and persistent reference to records even after page movements or other changes that might alter physical storage locations. This is crucial for ensuring data consistency and integrity across different database operations and updates.",
+   "generationMs": 17619,
+   "label": "correct",
+   "borderline": false,
+   "wrongSentences": [],
+   "note": "'a database like BuzzDB' is loose (ch07.023 says BuzzDB has no RIDs) but the reason given is right."
+  },
+  {
+   "id": "record_id_stability#2",
+   "caseId": "record_id_stability",
+   "split": "dev",
+   "seed": 2,
+   "question": "Why do indexes refer to records by record ID instead of by byte offset?",
+   "passageIds": [
+    "ch04.044",
+    "ch04.045",
+    "ch04.047",
+    "ch07.023"
+   ],
+   "answer": "Indexes in a database like BuzzDB should refer to records using their **Record ID (RID)** rather than direct file offsets because the physical storage location of data can change over time due to compaction processes. \n\nCompaction involves moving records around within pages, which would invalidate any external pointers referencing raw byte offsets. By storing RIDs instead, indexes maintain a stable and persistent reference to records even after page reorganization occurs during compaction.\n\nThis approach ensures that logical references remain correct while physical storage is updated, providing flexibility in managing database storage without breaking logical connections between data structures like indexes.",
+   "generationMs": 11031,
+   "label": "correct",
+   "borderline": false,
+   "wrongSentences": []
+  },
+  {
+   "id": "record_id_stability#3",
+   "caseId": "record_id_stability",
+   "split": "dev",
+   "seed": 3,
+   "question": "Why do indexes refer to records by record ID instead of by byte offset?",
+   "passageIds": [
+    "ch04.044",
+    "ch04.045",
+    "ch04.047",
+    "ch07.023"
+   ],
+   "answer": "Indexes in a database like BuzzDB should refer to records using their **Record ID (RID)** rather than direct file offsets because the physical storage location of data can change over time due to compaction processes. \n\nCompaction involves moving records around within pages, which would invalidate any external pointers referencing raw byte offsets. By storing RIDs instead, indexes maintain a stable and persistent reference to records even after such reorganization occurs.\n\nIn other words, using RIDs as pointers allows the database system to adapt its storage layout without breaking logical references between data structures like indexes.",
+   "generationMs": 20019,
+   "label": "correct",
+   "borderline": false,
+   "wrongSentences": []
+  },
+  {
+   "id": "clustered_vs_unclustered#1",
+   "caseId": "clustered_vs_unclustered",
+   "split": "dev",
+   "seed": 1,
+   "question": "What's the difference between a clustered and an unclustered index?",
+   "passageIds": [
+    "ch07.056",
+    "ch07.058",
+    "ch04.077"
+   ],
+   "answer": "A **clustered index** determines the physical order of data records in a table, meaning that the database system attempts to keep the data rows on disk sorted according to the index key. In contrast, an **unclustered index** is a separate structure from the data file and has its own logical order, which is independent of the physical order of the data rows.\n\nThe main difference between these two types of indexes lies in how they organize the data:\n\n*   Clustered Index:\n    *   Data records are stored on disk sorted according to the index key.\n    *   The primary advantage is efficiency for range queries on the clustered key, as it allows for sequential access and minimizes seek operations.\n\n*   Unclustered Index:\n    *   A separate structure from the data file with its own logical order.\n    *   Data records are stored in an unordered heap (a pile of pages) until they're inserted or updated.\n    *   The primary advantage is flexibility, as multiple unclustered indexes can be created on a single table to support different query patterns.\n\nIn summary, clustered indices provide efficient range queries by sorting data physically, while unclustered indexes offer more flexibility and are better suited for complex querying scenarios.",
+   "generationMs": 39569,
+   "label": "partly_wrong",
+   "borderline": false,
+   "wrongSentences": [
+    {
+     "id": 8,
+     "kind": "unsupported",
+     "why": "Passages never say unclustered indexes are better for complex querying scenarios."
+    },
+    {
+     "id": 6,
+     "kind": "unsupported",
+     "why": "'until they're inserted or updated' is meaningless/unsupported; heap records simply have no order.",
+     "borderline": true
+    }
+   ]
+  },
+  {
+   "id": "clustered_vs_unclustered#2",
+   "caseId": "clustered_vs_unclustered",
+   "split": "dev",
+   "seed": 2,
+   "question": "What's the difference between a clustered and an unclustered index?",
+   "passageIds": [
+    "ch07.056",
+    "ch07.058",
+    "ch04.077"
+   ],
+   "answer": "A **clustered index** determines the physical order of data records in a table, meaning that the database system attempts to keep the data rows on disk sorted according to the index key. In contrast, an **unclustered index** is a separate structure from the data file and has its own logical order, which is independent of the physical order of the data rows.\n\nThe main difference between these two types of indexes lies in how they organize the data:\n\n*   Clustered Index:\n    *   Data records are stored on disk sorted according to the index key.\n    *   A table can have at most one clustered index.\n    *   The primary advantage is its efficiency for range queries on the clustered key.\n\n*   Unclustered Index:\n    *   Separate structure from the data file with a logical order independent of physical storage.\n    *   Can be used to support multiple queries simultaneously without compromising performance.\n    *   Data records are stored in an unordered heap, and pointers (RIDs) point to their locations.",
+   "generationMs": 21599,
+   "label": "partly_wrong",
+   "borderline": false,
+   "wrongSentences": [
+    {
+     "id": 7,
+     "kind": "unsupported",
+     "why": "Passages say a table can have many unclustered indexes, not that they support multiple queries simultaneously without compromising performance."
+    }
+   ]
+  },
+  {
+   "id": "clustered_vs_unclustered#3",
+   "caseId": "clustered_vs_unclustered",
+   "split": "dev",
+   "seed": 3,
+   "question": "What's the difference between a clustered and an unclustered index?",
+   "passageIds": [
+    "ch07.056",
+    "ch07.058",
+    "ch04.077"
+   ],
+   "answer": "A **clustered index** determines the physical order of data records in a table, where the data file itself *is* the index. In other words, the rows on disk are stored sorted according to the index key.\n\nOn the other hand, an **unclustered index** is a separate structure that contains the index key values and pointers to the corresponding data record locations. The physical order of the data rows remains unchanged; instead, unclustered indexes provide a logical ordering based on their keys.\n\nTo illustrate this difference:\n\n*   A clustered index would store all employees with `EmployeeID` between 10001 and 10100 in consecutive disk blocks.\n*   An unclustered index for `EmployeeID`, however, might contain the following entries: `(10100, RID of employee 1), (9000, RID of employee 2), ...`. The actual data rows are stored elsewhere on disk without any specific ordering based on their IDs.\n\nThis distinction is crucial because it affects how queries are executed and optimized. Clustered indexes provide a significant advantage for range queries that span the entire index key space but can lead to poor performance if only a small portion of the index keys match the query condition. Unclustered indexes, in contrast, offer flexibility with multiple indices on different columns while potentially leading to slower query execution due to increased disk I/O and page splits.\n\nIn summary:\n\n*   Clustered Index: Physical order determined by the index key; data file is sorted according to the index.\n*   Unclustered Index: Logical ordering based on keys; physical order of rows remains unchanged.",
+   "generationMs": 51646,
+   "label": "partly_wrong",
+   "borderline": false,
+   "wrongSentences": [
+    {
+     "id": 9,
+     "kind": "unsupported",
+     "why": "Passages never say clustered indexes perform poorly when few keys match."
+    },
+    {
+     "id": 10,
+     "kind": "unsupported",
+     "why": "Passages never mention extra disk I/O or page splits as a cost of unclustered indexes."
+    }
+   ]
+  },
+  {
+   "id": "index_write_penalty#1",
+   "caseId": "index_write_penalty",
+   "split": "dev",
+   "seed": 1,
+   "question": "What is the write penalty of adding indexes to a table?",
+   "passageIds": [
+    "ch07.069",
+    "ch07.071",
+    "ch07.073",
+    "ch04.078"
+   ],
+   "answer": "The write penalty, also known as index maintenance cost or additional work required for data modifications, increases with the number of indexes on a table. This means that tables with more indexes incur higher costs when performing `INSERT`, `UPDATE`, and `DELETE` operations.\n\nIn particular, adding new entries to an index during these operations can be expensive because it requires updating the index mapping to point to the correct location in the data pages. The cost of this operation is often referred to as \"index write.\"",
+   "generationMs": 15845,
+   "label": "correct",
+   "borderline": true,
+   "wrongSentences": [],
+   "note": "Sentence 3 singles out inserts as expensive (passage says updates are most expensive); loose."
+  },
+  {
+   "id": "index_write_penalty#2",
+   "caseId": "index_write_penalty",
+   "split": "dev",
+   "seed": 2,
+   "question": "What is the write penalty of adding indexes to a table?",
+   "passageIds": [
+    "ch07.069",
+    "ch07.071",
+    "ch07.073",
+    "ch04.078"
+   ],
+   "answer": "The write penalty, also known as index maintenance cost or additional work required for data modifications, increases with the number of indexes on a table. This means that tables with more indexes incur higher costs when performing `INSERT`, `UPDATE`, and `DELETE` operations.\n\nIn particular, adding an index to a table can require:\n\n*   Additional storage space\n*   More complex query processing algorithms\n*   Increased maintenance overhead during data modifications\n\nFor example, consider the scenario where we add an index on the `sku` column of our `Products` table. When performing an `INSERT`, `UPDATE`, or `DELETE` operation, the database must not only update the corresponding row in the table but also modify the associated index entries.\n\nThis additional work contributes to a higher write penalty for tables with indexes compared to those without them.",
+   "generationMs": 15322,
+   "label": "partly_wrong",
+   "borderline": false,
+   "wrongSentences": [
+    {
+     "id": 3,
+     "kind": "unsupported",
+     "why": "Storage space is not mentioned as part of the write penalty."
+    },
+    {
+     "id": 4,
+     "kind": "unsupported",
+     "why": "'More complex query processing algorithms' is not in the passages."
+    }
+   ]
+  },
+  {
+   "id": "index_write_penalty#3",
+   "caseId": "index_write_penalty",
+   "split": "dev",
+   "seed": 3,
+   "question": "What is the write penalty of adding indexes to a table?",
+   "passageIds": [
+    "ch07.069",
+    "ch07.071",
+    "ch07.073",
+    "ch04.078"
+   ],
+   "answer": "The write penalty, also known as index maintenance cost or write overhead, refers to the additional work required by database systems when performing data modifications such as `INSERT`, `UPDATE`, and `DELETE` operations on tables with indexes. This extra work involves updating every index on that table.\n\nIn other words, each time a modification is made to a table with an index, the system must not only perform the original operation (e.g., adding or modifying data) but also update all relevant indexes to maintain their accuracy and consistency. The more indexes a table has, the higher this penalty becomes because there are more updates required for each individual data modification.\n\nFor example, consider a `Products` table with an index on the `sku` column. When you insert a new product or update an existing one's SKU value, the database must perform two distinct operations: updating the corresponding row in the `Products` table and adding or modifying the entry in the `sku` index.\n\nThis additional overhead is often referred to as the write penalty because it represents the extra cost incurred by maintaining indexes during data modifications. The more complex the indexing scheme (i.e., the larger number of indexes), the higher this penalty will be, potentially impacting performance and scalability for large datasets or high-traffic applications.",
+   "generationMs": 35282,
+   "label": "correct",
+   "borderline": true,
+   "wrongSentences": [],
+   "note": "Sentence 8 adds scalability/high-traffic impact; generic."
+  },
+  {
+   "id": "rtree_mbr_overlap#1",
+   "caseId": "rtree_mbr_overlap",
+   "split": "heldout",
+   "seed": 1,
+   "question": "How do the bounding rectangles in an R-Tree node differ from the key ranges in a B+ Tree node?",
+   "passageIds": [
+    "ch10.030",
+    "ch10.031",
+    "ch09.023"
+   ],
+   "answer": "In an **R-Tree**, each internal node contains entries that consist of an MBR (Minimum Bounding Rectangle) and a pointer to a child node. The MBR is the smallest rectangle, aligned with the coordinate axes, that completely encloses all the MBRs in the child node it points to.\n\nIn contrast, a **B+ Tree** node typically contains key ranges rather than bounding rectangles. Each internal node in a B+ Tree stores multiple key ranges (also known as intervals or segments) instead of individual keys and pointers like an R-Tree node does. These key ranges are ordered by their start values and do not overlap.\n\nThe main difference between the two data structures is that **R-Trees** use bounding rectangles to partition space, while **B+ Trees** use key ranges to order and search for data. This distinction influences how each tree is built and queried, with R-Tree nodes often having overlapping MBRs and B+ Tree nodes typically containing non-overlapping key ranges.\n\nThis difference in design leads to different trade-offs between query performance and storage efficiency. While both data structures aim to reduce the number of disk accesses required for queries, their approaches differ significantly: **R-Trees** partition space using bounding rectangles that can overlap, whereas **B+ Trees** use a more traditional binary search tree approach with non-overlapping key ranges.\n\nThe choice between an R-Tree and a B+ Tree ultimately depends on the specific requirements of your data storage needs.",
+   "generationMs": 41439,
+   "label": "partly_wrong",
+   "borderline": false,
+   "wrongSentences": [
+    {
+     "id": 4,
+     "kind": "contradicted",
+     "why": "B+ Tree internal nodes hold keys and child pointers; the answer says they hold ranges 'instead of individual keys and pointers like an R-Tree node', and R-Tree entries are MBR plus pointer."
+    },
+    {
+     "id": 9,
+     "kind": "contradicted",
+     "why": "A B+ Tree is explicitly not a binary search tree (ch09.023)."
+    }
+   ]
+  },
+  {
+   "id": "rtree_mbr_overlap#2",
+   "caseId": "rtree_mbr_overlap",
+   "split": "heldout",
+   "seed": 2,
+   "question": "How do the bounding rectangles in an R-Tree node differ from the key ranges in a B+ Tree node?",
+   "passageIds": [
+    "ch10.030",
+    "ch10.031",
+    "ch09.023"
+   ],
+   "answer": "In an **R-Tree**, each internal node contains entries that consist of an MBR (Minimum Bounding Rectangle) and a pointer to a child node. The MBR is the smallest rectangle, aligned with the coordinate axes, that completely encloses all the MBRs in the child node it points to.\n\nIn contrast, a **B+ Tree** node typically contains key ranges rather than bounding rectangles. Each internal node in a B+ Tree stores multiple key ranges (also known as intervals or segments) and pointers to its child nodes. These key ranges are ordered and do not overlap with each other.\n\nThe main difference between the two is that an R-Tree's MBRs can be overlapping, whereas B+ Tree nodes contain non-overlapping key ranges. This distinction influences how the tree is built and queried in both data structures.",
+   "generationMs": 16443,
+   "label": "correct",
+   "borderline": false,
+   "wrongSentences": []
+  },
+  {
+   "id": "rtree_mbr_overlap#3",
+   "caseId": "rtree_mbr_overlap",
+   "split": "heldout",
+   "seed": 3,
+   "question": "How do the bounding rectangles in an R-Tree node differ from the key ranges in a B+ Tree node?",
+   "passageIds": [
+    "ch10.030",
+    "ch10.031",
+    "ch09.023"
+   ],
+   "answer": "In an **R-Tree**, each internal node contains entries that consist of an MBR (Minimum Bounding Rectangle) and a pointer to a child node. The MBR is the smallest rectangle, aligned with the coordinate axes, that completely encloses all the MBRs in the child node it points to.\n\nIn contrast, a **B+ Tree** node typically contains key ranges rather than bounding rectangles. Each internal node in a B+ Tree stores an ordered list of keys and pointers to its child nodes. The height of the tree is determined by how many levels deep each level can be filled before the disk I/O overhead becomes too high.\n\nThe main difference between MBRs in R-Tree nodes and key ranges in B+ Tree nodes lies in their purpose: **overlapping** vs. **non-overlapping**, and **small rectangles** vs. **key ranges with varying sizes**. While both data structures aim to reduce the number of disk I/O operations, they achieve this through different design choices.\n\nIn an R-Tree node, MBRs can overlap because their purpose is not to represent a specific range but rather to enclose all objects in that child node. This overlapping nature allows for more efficient partitioning and reduces the height of the tree compared to B+ Tree nodes with non-overlapping key ranges.\n\nOn the other hand, B+ Tree nodes are designed to minimize disk I/O by using large pages (typically 4KB or larger) and a high \"fan-out\" factor. The ordering of keys in these nodes ensures that each step down the tree reduces the search space by a fixed amount, which helps maintain an efficient height.\n\nIn summary: MBRs in R-Tree nodes are designed for spatial containment rather than representing specific ranges; they can overlap to efficiently partition data. In contrast, B+ Tree nodes use key ranges with varying sizes and ordering to minimize disk I/O while maintaining non-overlapping keys within each node.",
+   "generationMs": 55572,
+   "label": "partly_wrong",
+   "borderline": false,
+   "wrongSentences": [
+    {
+     "id": 5,
+     "kind": "unsupported",
+     "why": "Passages say nothing like this about how the tree height is determined."
+    },
+    {
+     "id": 9,
+     "kind": "unsupported",
+     "why": "Passages never say overlap reduces R-Tree height compared to a B+ Tree."
+    },
+    {
+     "id": 11,
+     "kind": "contradicted",
+     "why": "Each step narrows the search by a factor of hundreds, not 'a fixed amount'.",
+     "borderline": true
+    }
+   ]
+  },
+  {
+   "id": "inverted_index_posting_list#1",
+   "caseId": "inverted_index_posting_list",
+   "split": "heldout",
+   "seed": 1,
+   "question": "What is a posting list in an inverted index?",
+   "passageIds": [
+    "ch10.056",
+    "ch10.058",
+    "ch07.018"
+   ],
+   "answer": "A posting list is a data structure used in an inverted index. It maps each term to a list of all documents that contain it.\n\nIn more detail, the main dictionary (a `std::unordered_map<std::string, ...>`) stores terms as keys and their corresponding values are another map (`std::unordered_map<int, ...>>`). This inner map is the posting list, where its key is an integer representing a document ID. The value associated with each document ID is a vector of integers storing the 0-indexed positions where the term appears in that document.\n\nFor example, if we have a query \"find all documents containing 'SQL'\", the system would look up 'sql' in its dictionary and retrieve the corresponding posting list `[doc_3, doc_8, doc_42]`, which contains the IDs of the documents that contain the word 'SQL'.",
+   "generationMs": 27276,
+   "label": "correct",
+   "borderline": true,
+   "wrongSentences": [],
+   "note": "Sentence 2 says the posting list maps each term to documents; strictly the index does the mapping and the posting list is the list. Same in #2 and #3."
+  },
+  {
+   "id": "inverted_index_posting_list#2",
+   "caseId": "inverted_index_posting_list",
+   "split": "heldout",
+   "seed": 2,
+   "question": "What is a posting list in an inverted index?",
+   "passageIds": [
+    "ch10.056",
+    "ch10.058",
+    "ch07.018"
+   ],
+   "answer": "A posting list is a data structure used in an inverted index. It maps each term to a list of all documents that contain it.\n\nIn more detail, the main dictionary (an unordered map) stores terms as keys and another unordered map as values. The inner map has document IDs as keys and vectors of positions where the term appears in those documents as values.",
+   "generationMs": 7400,
+   "label": "correct",
+   "borderline": true,
+   "wrongSentences": [],
+   "note": "See #1, sentence 2."
+  },
+  {
+   "id": "inverted_index_posting_list#3",
+   "caseId": "inverted_index_posting_list",
+   "split": "heldout",
+   "seed": 3,
+   "question": "What is a posting list in an inverted index?",
+   "passageIds": [
+    "ch10.056",
+    "ch10.058",
+    "ch07.018"
+   ],
+   "answer": "A posting list is a data structure used in an inverted index. It maps each term to a list of all documents that contain it.\n\nIn more detail, the main dictionary (a `std::unordered_map<std::string, ...>`) stores terms as keys and another map (`... std::unordered_map<int, ...>>`) as values. The inner map's key is an integer representing a document ID, and its value is a vector of integers storing 0-indexed positions where the term appears in that document.\n\nThis structure allows for efficient querying by searching for documents containing specific terms or phrases, such as \"find all documents containing 'SQL'\".",
+   "generationMs": 24284,
+   "label": "correct",
+   "borderline": true,
+   "wrongSentences": [],
+   "note": "See #1, sentence 2."
+  },
+  {
+   "id": "hnsw_layers#1",
+   "caseId": "hnsw_layers",
+   "split": "heldout",
+   "seed": 1,
+   "question": "Why does HNSW use multiple layers instead of one proximity graph?",
+   "passageIds": [
+    "ch10.088",
+    "ch10.089",
+    "ch08.007"
+   ],
+   "answer": "HNSW uses multiple layers to improve the efficiency and scalability of its search algorithm. The key innovation behind this approach is that it allows for a trade-off between exploration and exploitation.\n\nIn a single layer, the search would start at a random node and \"walk\" through the graph, always moving to the neighbor closest to the query vector until a local minimum is reached. However, this can easily get stuck in a region of the graph that is far from the true nearest neighbor.\n\nBy using multiple layers, HNSW achieves two main benefits:\n\n1.  **Long-distance navigation**: The edges in higher, sparser layers act as \"expressways\" for navigating long distances across the vector space quickly and efficiently.\n2.  **Fine-grained refinement**: Lower, denser layers provide a more detailed representation of the proximity relationships between data points.\n\nThe multi-layer structure allows HNSW to balance exploration (moving through high-level graph) with exploitation (focusing on lower-level details). This enables it to effectively search for nearest neighbors while avoiding getting stuck in regions far from the true minimum.",
+   "generationMs": 31173,
+   "label": "partly_wrong",
+   "borderline": false,
+   "wrongSentences": [
+    {
+     "id": 2,
+     "kind": "unsupported",
+     "why": "Passages never describe an exploration/exploitation trade-off."
+    },
+    {
+     "id": 7,
+     "kind": "unsupported",
+     "why": "Same invented exploration/exploitation framing."
+    }
+   ]
+  },
+  {
+   "id": "hnsw_layers#2",
+   "caseId": "hnsw_layers",
+   "split": "heldout",
+   "seed": 2,
+   "question": "Why does HNSW use multiple layers instead of one proximity graph?",
+   "passageIds": [
+    "ch10.088",
+    "ch10.089",
+    "ch08.007"
+   ],
+   "answer": "HNSW uses multiple layers to improve the efficiency and scalability of its search algorithm. The key innovation behind this approach is that it allows for a trade-off between the accuracy of the nearest neighbor search and the computational cost.\n\nIn a single, flat proximity graph with all data points connected, searching for the nearest neighbor can be computationally expensive due to the need to traverse long distances across the graph. This can lead to slow performance when dealing with large datasets or complex query patterns.\n\nBy dividing the graph into multiple layers, HNSW achieves several benefits:\n\n1.  **Reduced search space**: Each layer represents a coarser approximation of the proximity relationships between data points. By focusing on higher-level features and using sparse subgraphs, HNSW reduces the number of nodes that need to be considered during the search process.\n2.  **Improved scalability**: As each subsequent layer becomes increasingly sparse, the computational cost associated with traversing these layers decreases dramatically. This allows HNSW to scale more efficiently when dealing with large datasets or complex query patterns.\n3.  **Enhanced locality of reference**: The hierarchical structure introduced by multiple layers enables a form of locality of reference, where search queries can quickly traverse long distances across the graph without having to scan the entire space.\n\nBy balancing these competing factors and using multiple layers instead of one proximity graph, HNSW achieves faster performance while maintaining acceptable accuracy for nearest neighbor searches.",
+   "generationMs": 27191,
+   "label": "wrong",
+   "borderline": false,
+   "wrongSentences": [
+    {
+     "id": 2,
+     "kind": "unsupported",
+     "why": "Passages give no accuracy/cost trade-off as the key innovation."
+    },
+    {
+     "id": 3,
+     "kind": "contradicted",
+     "why": "The passage's problem with one flat graph is getting stuck in a local minimum far from the true neighbor, not the cost of long traversals."
+    },
+    {
+     "id": 6,
+     "kind": "unsupported",
+     "why": "'Focusing on higher-level features' is not in the passages."
+    },
+    {
+     "id": 7,
+     "kind": "unsupported",
+     "why": "Passages do not discuss computational cost decreasing per layer."
+    },
+    {
+     "id": 9,
+     "kind": "unsupported",
+     "why": "Passages never mention locality of reference."
+    }
+   ]
+  },
+  {
+   "id": "hnsw_layers#3",
+   "caseId": "hnsw_layers",
+   "split": "heldout",
+   "seed": 3,
+   "question": "Why does HNSW use multiple layers instead of one proximity graph?",
+   "passageIds": [
+    "ch10.088",
+    "ch10.089",
+    "ch08.007"
+   ],
+   "answer": "HNSW uses multiple layers to improve the efficiency and scalability of its search algorithm. The key innovation behind this approach is that it allows for a trade-off between the density of the graph (i.e., how many nodes are connected to each other) and the sparsity of the graph.\n\nBy having a dense base layer with every data point, HNSW can quickly find nearby points in the vector space. However, as you move up the layers, the number of neighbors decreases significantly due to sparse connections between nodes. This allows for faster traversal across long distances within the graph but requires more computations when refining the search near the query point.\n\nThe use of multiple layers acts like an \"expressway\" system where searches can quickly traverse long distances at higher levels before descending into denser, lower-level graphs for finer-grained refinement.",
+   "generationMs": 27516,
+   "label": "partly_wrong",
+   "borderline": false,
+   "wrongSentences": [
+    {
+     "id": 2,
+     "kind": "unsupported",
+     "why": "Passages do not describe a density vs sparsity trade-off as the key innovation."
+    },
+    {
+     "id": 5,
+     "kind": "unsupported",
+     "why": "Passages do not say higher layers require more computation when refining."
+    }
+   ]
+  },
+  {
+   "id": "materialization_vs_pipelining#1",
+   "caseId": "materialization_vs_pipelining",
+   "split": "heldout",
+   "seed": 1,
+   "question": "How does materialization compare to pipelining in query execution?",
+   "passageIds": [
+    "ch11.031",
+    "ch11.032",
+    "ch06.084"
+   ],
+   "answer": "Materialization and pipelining are two different approaches to executing a query. \n\nIn a **materialization** approach, each operator executes to completion before passing its result set to the next operator. This results in high I/O costs due to frequent disk writes and reads of intermediate results.\n\nOn the other hand, a **pipelined execution model**, also known as an iterator-based model, allows operators to process data in a more sequential manner without writing intermediate results to disk. Instead, each operator processes one tuple at a time, passing it along to the next operator until the entire query plan is complete.\n\nThe key differences between materialization and pipelining are:\n\n*   I/O cost: Materialization has high I/O costs due to frequent disk writes and reads of intermediate results, while pipelining minimizes I/O by processing data in memory.\n*   Memory usage: Pipelining requires less memory since each operator only needs enough space to hold a single tuple at a time. In contrast, materialization may consume more memory if intermediate results are buffered in RAM instead of on disk.\n*   Latency to first tuple: Materialization can result in high latency because the client receives no results until the entire query plan has run to completion. Pipelining allows for faster response times since the first result is returned as soon as it makes its way up the pipeline.\n\nOverall, while materialization may be simpler from an individual operator perspective, pipelining offers significant performance benefits due to reduced I/O costs and lower memory usage.",
+   "generationMs": 42257,
+   "label": "correct",
+   "borderline": false,
+   "wrongSentences": []
+  },
+  {
+   "id": "materialization_vs_pipelining#2",
+   "caseId": "materialization_vs_pipelining",
+   "split": "heldout",
+   "seed": 2,
+   "question": "How does materialization compare to pipelining in query execution?",
+   "passageIds": [
+    "ch11.031",
+    "ch11.032",
+    "ch06.084"
+   ],
+   "answer": "Materialization and pipelining are two different approaches to executing a query. The main difference between them lies in how they handle intermediate results and I/O operations.\n\nIn the **materialization** approach, each operator executes to completion before passing its result set to the next operator. This means that every row from the `students` table is read into memory (or written to disk) at Step 1, then all rows are scanned again for filtering (`gpa > 3.5`) and stored in a second file at Step 2, and finally only relevant columns are extracted and sent to the client.\n\nIn contrast, **pipelining** involves processing each operator's input as soon as it becomes available, without waiting for previous operators to complete their work. This means that data is read tables once and flows directly between operators in memory (or on disk), with minimal I/O operations.\n\nThe key performance differences are:\n\n*   **I/O Cost**: Materialization involves significant intermediate I/O due to writing results to disk, whereas pipelining minimizes I/O by processing each operator's input immediately.\n*   **Memory Usage**: Pipelining requires less memory since only a single tuple needs to be held in memory at any given time. In contrast, materialization may consume more RAM if intermediate results are buffered in memory instead of on disk.\n*   **Latency to First Tuple**: Materialization can result in higher latency due to the sequential nature of its execution plan, whereas pipelining allows for faster response times since the first tuple is returned as soon as it becomes available.\n\nOverall, while materialization may be simpler from an individual operator perspective, pipelining offers better performance and scalability by minimizing I/O operations and optimizing memory usage.",
+   "generationMs": 35896,
+   "label": "partly_wrong",
+   "borderline": true,
+   "wrongSentences": [
+    {
+     "id": 6,
+     "kind": "contradicted",
+     "why": "In pipelining data flows between operators in memory with no intermediate I/O; '(or on disk)' contradicts that.",
+     "borderline": true
+    }
+   ]
+  },
+  {
+   "id": "materialization_vs_pipelining#3",
+   "caseId": "materialization_vs_pipelining",
+   "split": "heldout",
+   "seed": 3,
+   "question": "How does materialization compare to pipelining in query execution?",
+   "passageIds": [
+    "ch11.031",
+    "ch11.032",
+    "ch06.084"
+   ],
+   "answer": "Materialization and pipelining are two different approaches to executing a query. \n\nIn **materialization**, each operator executes to completion, writing its entire result set to a temporary buffer before the next operator can begin. This approach has severe performance drawbacks compared to pipelining.\n\n**Key differences between materialization and pipelining:**\n\n*   I/O Cost: Materialization has very high I/O costs due to intermediate results being written to disk and then read back by the next operator, which can double the I/O for each step. Pipelining, on the other hand, minimizes I/O as data is read from source tables once and flows directly between operators in memory.\n*   Memory Usage: Materialization potentially consumes huge amounts of RAM if intermediate results are buffered in memory instead of on disk. Pipelining uses very low memory as each operator typically only needs enough memory to hold a single tuple at a time.\n*   Latency to First Tuple: The client receives no results until the entire query plan has run to completion, which can take a long time. In contrast, pipelining returns the first result tuple almost instantly.\n\n**Comparison metrics**\n\n| Metric | Materialization Model | Pipelining (Iterator) Model |\n| ----------------------- | ----------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |\n| **I/O Cost** | Very high. Intermediate results are written to disk and then read back by the next operator. This can double the I/O for each step. | Minimal. Data is read from source tables once and flows directly between operators in memory. No intermediate I/O. |\n| **Memory Usage** | Potentially very high. If intermediate results are buffered in memory instead of on disk, they may consume huge amounts of RAM. | Very low. Each operator typically only needs enough memory to hold a single tuple at a time. |\n| **Latency to First Tuple** | High. The client receives no results until the entire query plan has run to completion, step by step. This can take a long time. | Very low. The first result tuple is returned as soon as it makes its way up the pipeline, often almost instantly. |\n\nIn summary, materialization and pipelining have different performance characteristics due to their distinct approaches to executing queries. Materialization has high I/O costs, memory usage, and latency, while pipelining minimizes these drawbacks by reducing I/O, using low memory, and returning results quickly.",
+   "generationMs": 73466,
+   "label": "correct",
+   "borderline": false,
+   "wrongSentences": []
+  },
+  {
+   "id": "hash_join_partially_blocking#1",
+   "caseId": "hash_join_partially_blocking",
+   "split": "heldout",
+   "seed": 1,
+   "question": "Why is a hash join called partially blocking?",
+   "passageIds": [
+    "ch11.089",
+    "ch11.090",
+    "ch08.058"
+   ],
+   "answer": "A `HashJoinOperator` is considered \"partially blocking\" because it operates in two phases.\n\nIn the first phase, it completely consumes one of its inputs (the \"build\" side), using it to construct an in-memory hash table. This is a blocking phase because it must consume all input data for this step.\n\nOnce the hash table is built, however, it can begin reading the second input (the \"probe\" side) one tuple at a time and checking for matches against the hash table. For each probe tuple that has a match in the hash table, it can immediately output any resulting joined tuples. This means that while the first phase blocks on its build input, the subsequent phases are non-blocking because they only need to process individual tuples from the second input.\n\nThis partially blocking behavior allows `HashJoinOperator` to take advantage of both the benefits of a blocking operator (building an efficient hash table) and those of a non-blocking operator (processing data in chunks).",
+   "generationMs": 31211,
+   "label": "correct",
+   "borderline": true,
+   "wrongSentences": [],
+   "note": "Sentence 7 says the probe side processes data 'in chunks'; the passage says one tuple at a time."
+  },
+  {
+   "id": "hash_join_partially_blocking#2",
+   "caseId": "hash_join_partially_blocking",
+   "split": "heldout",
+   "seed": 2,
+   "question": "Why is a hash join called partially blocking?",
+   "passageIds": [
+    "ch11.089",
+    "ch11.090",
+    "ch08.058"
+   ],
+   "answer": "A `HashJoinOperator` is considered \"partially blocking\" because it operates in two phases.\n\nIn the first phase, also known as the \"build\" phase, it completely consumes one of its inputs (the \"build\" side) to construct an in-memory hash table. This phase can be considered a blocking operation since it requires access to all tuples on that input before proceeding.\n\nHowever, once the hash table is built, the `HashJoinOperator` can begin reading the second input (the \"probe\" side) one tuple at a time and checking for matches against the hash table. For each probe tuple, it can immediately output any resulting joined tuples without having to access all of its own data.\n\nThis means that while the operator is blocking on one input during the build phase, it is non-blocking on the other input once the build phase is complete. This partially blocking behavior allows `HashJoinOperator` to strike a balance between the benefits of hash joins (fast matching and joining) and the limitations of traditional join algorithms.\n\nBy operating in two phases with different levels of data access, the `HashJoinOperator` can take advantage of both its inputs while minimizing the impact on query performance.",
+   "generationMs": 24383,
+   "label": "correct",
+   "borderline": true,
+   "wrongSentences": [],
+   "note": "Sentences 7-8 are vague filler not in the passages (balance with 'limitations of traditional join algorithms')."
+  },
+  {
+   "id": "hash_join_partially_blocking#3",
+   "caseId": "hash_join_partially_blocking",
+   "split": "heldout",
+   "seed": 3,
+   "question": "Why is a hash join called partially blocking?",
+   "passageIds": [
+    "ch11.089",
+    "ch11.090",
+    "ch08.058"
+   ],
+   "answer": "A `HashJoinOperator` is considered \"partially blocking\" because it operates in two phases.\n\nIn the first phase, it completely consumes one of its inputs (the \"build\" side), using it to construct an in-memory hash table. This is a blocking phase, as it must consume all input data to build the hash table.\n\nHowever, once the hash table is built, it can begin reading the second input (the \"probe\" side) one tuple at a time. For each probe tuple, it checks the hash table for matches and can immediately output any resulting joined tuples. This means that while the first phase blocks on one input, the subsequent phases are non-blocking.\n\nThis partially blocking behavior allows `HashJoinOperator` to balance between two competing goals: building an efficient hash table (which requires consuming all build-side data) and streaming probe-side data as quickly as possible.",
+   "generationMs": 34989,
+   "label": "correct",
+   "borderline": false,
+   "wrongSentences": []
+  },
+  {
+   "id": "direct_vs_indirect_operands#1",
+   "caseId": "direct_vs_indirect_operands",
+   "split": "heldout",
+   "seed": 1,
+   "question": "What is the difference between a DIRECT and an INDIRECT operand in a BuzzDB predicate?",
+   "passageIds": [
+    "ch12.032",
+    "ch12.034",
+    "ch14.037"
+   ],
+   "answer": "A `DIRECT` operand contains a constant value, whereas an `INDIRECT` operand refers to a column within a tuple. In other words:\n\n*   A `DIRECT` operand holds a literal value directly.\n*   An `INDIRECT` operand is a placeholder that references the index of a specific column in a tuple.\n\nThis distinction allows for more flexibility and abstraction when defining predicates, enabling the representation of complex comparisons using simple operands.",
+   "generationMs": 15503,
+   "label": "correct",
+   "borderline": false,
+   "wrongSentences": []
+  },
+  {
+   "id": "direct_vs_indirect_operands#2",
+   "caseId": "direct_vs_indirect_operands",
+   "split": "heldout",
+   "seed": 2,
+   "question": "What is the difference between a DIRECT and an INDIRECT operand in a BuzzDB predicate?",
+   "passageIds": [
+    "ch12.032",
+    "ch12.034",
+    "ch14.037"
+   ],
+   "answer": "In a BuzzDB predicate, there are two types of operands: `DIRECT` and `INDIRECT`. \n\nThe main difference between them lies in how they represent values. A `DIRECT` operand contains a constant value directly within it, whereas an `INDIRECT` operand refers to a column within a tuple.\n\nFor example, if you have a predicate like `(A > 10)`, the left operand is `A` and its type would be `DIRECT`. On the other hand, if your query includes a range comparison like `(B >= 20 AND C < 30)`, then one of the operands (let's say B) could be an `INDIRECT` operand because it refers to a column within a tuple.",
+   "generationMs": 13251,
+   "label": "partly_wrong",
+   "borderline": false,
+   "wrongSentences": [
+    {
+     "id": 4,
+     "kind": "contradicted",
+     "why": "In (A > 10) the column A is the INDIRECT operand (it refers to a column); 10 is the DIRECT one."
+    }
+   ]
+  },
+  {
+   "id": "direct_vs_indirect_operands#3",
+   "caseId": "direct_vs_indirect_operands",
+   "split": "heldout",
+   "seed": 3,
+   "question": "What is the difference between a DIRECT and an INDIRECT operand in a BuzzDB predicate?",
+   "passageIds": [
+    "ch12.032",
+    "ch12.034",
+    "ch14.037"
+   ],
+   "answer": "In a BuzzDB predicate, the main difference between a `DIRECT` and an `INDIRECT` operand lies in how they represent values.\n\nA `DIRECT` operand contains a constant value. This means that it holds a literal value directly, such as `'hello'`, 10, or any other fixed data point. The relevant data for a `DIRECT` operand is stored in the `directValue` member of an `Operand` object, which is a unique pointer to a `Field`. A `Field` can hold various types of values.\n\nOn the other hand, an `INDIRECT` operand refers to a column within a tuple. It specifies the index (0-based) of that column using the `index` member of an `Operand` object. This placeholder indicates where in the tuple data you need to find a value for comparison purposes but does not contain any actual value itself.\n\nIn summary, one represents a fixed literal value and the other is a reference to a specific position within a collection (tuple) that needs to be looked up based on its index.",
+   "generationMs": 31634,
+   "label": "correct",
+   "borderline": false,
+   "wrongSentences": []
+  },
+  {
+   "id": "predicate_selectivity#1",
+   "caseId": "predicate_selectivity",
+   "split": "heldout",
+   "seed": 1,
+   "question": "What is the selectivity of a predicate?",
+   "passageIds": [
+    "ch12.110",
+    "ch12.111",
+    "ch07.056"
+   ],
+   "answer": "The selectivity of a predicate is defined as the fraction of tuples in a relation that are expected to satisfy the given condition. Mathematically, it can be represented as:\n\n**Selectivity = (Number of tuples satisfying predicate) / (Total number of tuples)**\n\nThis value ranges between 0 and 1.\n\nA selectivity close to 0 indicates that the predicate is very \"selective\" or \"pointy\", filtering out almost everything and keeping only a few tuples. On the other hand, a selectivity close to 1 means the predicate is not very selective, keeping almost all of the tuples.\n\nFor example, if we have a query `WHERE student_id = 1138`, which filters out most students except for one specific record with ID 1138, its selectivity would be extremely low (close to 0). In contrast, a query like `WHERE gpa > 0.0` might filter out only a small fraction of the total records, resulting in a higher selectivity value close to 1.",
+   "generationMs": 29995,
+   "label": "correct",
+   "borderline": false,
+   "wrongSentences": []
+  },
+  {
+   "id": "predicate_selectivity#2",
+   "caseId": "predicate_selectivity",
+   "split": "heldout",
+   "seed": 2,
+   "question": "What is the selectivity of a predicate?",
+   "passageIds": [
+    "ch12.110",
+    "ch12.111",
+    "ch07.056"
+   ],
+   "answer": "The selectivity of a predicate is defined as the fraction of tuples in a relation that are expected to satisfy the given condition. Mathematically, it can be represented as:\n\n**Selectivity = (Number of tuples satisfying predicate) / (Total number of tuples)**\n\nThis value ranges between 0 and 1.\n\nA selectivity close to 0 indicates that the predicate is very \"selective\" or \"pointy\", filtering out almost everything and keeping only a few tuples. On the other hand, a selectivity close to 1 means the predicate is not very selective, keeping almost all of the tuples.\n\nFor example, if we have a query `WHERE student_id = 1138`, which will match exactly one record (out of 50,000), its selectivity would be:\n\n**Selectivity = 1/50,000 ≈ 0.00002**\n\nThis shows that this predicate is very selective and filters out almost all records.\n\nIn contrast, a query like `WHERE gpa > 0.0` will have a high selectivity close to 1.0 because it keeps almost all of the tuples in the relation.",
+   "generationMs": 22830,
+   "label": "correct",
+   "borderline": false,
+   "wrongSentences": []
+  },
+  {
+   "id": "predicate_selectivity#3",
+   "caseId": "predicate_selectivity",
+   "split": "heldout",
+   "seed": 3,
+   "question": "What is the selectivity of a predicate?",
+   "passageIds": [
+    "ch12.110",
+    "ch12.111",
+    "ch07.056"
+   ],
+   "answer": "The selectivity of a predicate is defined as the fraction of tuples in a relation that are expected to satisfy the given condition. Mathematically, it can be represented as:\n\n**Selectivity = (Number of tuples satisfying predicate) / (Total number of tuples)**\n\nThis value ranges between 0 and 1.\n\nA selectivity close to 0 indicates that the predicate is very \"selective\" or \"pointy\", filtering out almost everything and keeping only a few tuples. On the other hand, a selectivity close to 1 means the predicate is not very selective, keeping almost all of the tuples.\n\nFor example, if we have a query `WHERE student_id = 1138`, the selectivity would be extremely low (0.00002), as it filters out most students and only returns one specific record. In contrast, a query like `WHERE gpa > 0.0` would likely have a high selectivity close to 1.0, as many students will satisfy this condition.",
+   "generationMs": 34829,
+   "label": "correct",
+   "borderline": false,
+   "wrongSentences": []
+  },
+  {
+   "id": "predicate_pushdown#1",
+   "caseId": "predicate_pushdown",
+   "split": "heldout",
+   "seed": 1,
+   "question": "What is predicate pushdown and why does it help?",
+   "passageIds": [
+    "ch12.119",
+    "ch12.121",
+    "ch07.066"
+   ],
+   "answer": "Predicate pushdown is an optimization technique used in query planning that involves applying filters before performing expensive operations like joins. In other words, instead of joining two tables based on a matching condition first, the optimizer applies filters to reduce the number of rows involved in the join.\n\nThis approach helps by reducing the size of the intermediate result set, which can significantly improve performance. By filtering out irrelevant data early on, the query planner avoids having to process large amounts of unnecessary data during the expensive join operation.\n\nTo illustrate this, consider a scenario where we want to find all Computer Science students enrolled in \"Advanced Databases\". A naive approach would involve joining two tables: `students` and `enrollments`. However, by applying filters first, we can reduce the number of rows involved in the join. In our example, the optimizer applies filters to select only CS students from `students`, resulting in 1,000 rows, and then selects only \"Advanced Databases\" enrollments from `enrollments`, resulting in 50 rows. The final join operation now operates on much smaller inputs, making it dramatically faster.\n\nIn summary, predicate pushdown helps by reducing the size of intermediate result sets, which can significantly improve query performance by avoiding unnecessary data processing during expensive operations like joins.",
+   "generationMs": 32451,
+   "label": "correct",
+   "borderline": false,
+   "wrongSentences": []
+  },
+  {
+   "id": "predicate_pushdown#2",
+   "caseId": "predicate_pushdown",
+   "split": "heldout",
+   "seed": 2,
+   "question": "What is predicate pushdown and why does it help?",
+   "passageIds": [
+    "ch12.119",
+    "ch12.121",
+    "ch07.066"
+   ],
+   "answer": "Predicate pushdown is an optimization technique used in query planning that involves applying filters to predicates (conditions) as early as possible, rather than performing them after a join operation. This approach helps improve the performance of queries by reducing the number of rows being joined together.\n\nTo understand why predicate pushdown is beneficial, consider what happens when you apply filters after a join operation. In the example material, suppose we have 50,000 students and 500,000 enrollment records. The intermediate result of the join could contain half a million rows, most of which would be filtered out by subsequent conditions.\n\nBy applying these filters before joining the tables, as predicate pushdown suggests, we can significantly reduce the number of rows being joined together. This is because many rows in one table will not match the filter criteria set for another table, so there's no need to join them.\n\nFor instance, if a query selects students from `students` where `major = 'CS'`, and then joins this result with enrollments where `course_name = 'Advanced Databases'`, we can apply these filters before joining. This reduces the number of rows being joined together dramatically, making the operation much faster.\n\nIn summary, predicate pushdown helps by reducing the amount of data that needs to be processed during a join operation, thereby improving query performance and efficiency.",
+   "generationMs": 25256,
+   "label": "correct",
+   "borderline": true,
+   "wrongSentences": [],
+   "note": "Sentence 1 ('applying filters to predicates') and 7 (rows of one table not matching another table's filter) are garbled."
+  },
+  {
+   "id": "predicate_pushdown#3",
+   "caseId": "predicate_pushdown",
+   "split": "heldout",
+   "seed": 3,
+   "question": "What is predicate pushdown and why does it help?",
+   "passageIds": [
+    "ch12.119",
+    "ch12.121",
+    "ch07.066"
+   ],
+   "answer": "Predicate pushdown is an optimization technique used in query planning that involves applying filters before performing expensive operations like joins. In other words, instead of filtering data after it has been joined from multiple tables, the optimizer applies filters to individual tables before joining them.\n\nThis approach helps by reducing the amount of unnecessary data being processed and transferred during the join operation. By doing so, predicate pushdown minimizes the impact of subsequent filter operations on performance.\n\nTo illustrate this concept, consider a query that joins two large tables based on a common column. If we apply filters to both tables before joining them, we can significantly reduce the number of rows being joined, resulting in faster execution times and reduced memory usage.\n\nIn general, predicate pushdown is particularly useful when dealing with queries that involve multiple joins or complex filter conditions. By applying these filters early in the query planning process, we can avoid unnecessary data processing and improve overall performance.",
+   "generationMs": 28855,
+   "label": "partly_wrong",
+   "borderline": true,
+   "wrongSentences": [
+    {
+     "id": 7,
+     "kind": "unsupported",
+     "why": "Passages do not say pushdown is particularly useful for multiple joins or complex filter conditions.",
+     "borderline": true
+    },
+    {
+     "id": 4,
+     "kind": "unsupported",
+     "why": "'minimizes the impact of subsequent filter operations' is not what the passages say.",
+     "borderline": true
+    }
+   ]
+  },
+  {
+   "id": "hash_combine_order#1",
+   "caseId": "hash_combine_order",
+   "split": "heldout",
+   "seed": 1,
+   "question": "Why doesn't BuzzDB just add the field hashes together when hashing a composite GROUP BY key?",
+   "passageIds": [
+    "ch13.038",
+    "ch08.023"
+   ],
+   "answer": "The provided text from \"13.2.3 Hashing Complex Keys\" explains why simply adding individual field hashes would be a poor combination strategy for hashing complex keys.\n\nAccording to this section, using `hash += fieldHash` would lead to collisions between different orders of the same fields (e.g., `'Sales'`, `'Q1'` and `'Q1'`, `'Sales'`). This is because the addition operation does not thoroughly mix the bits of the new hash into the existing one.\n\nIn contrast, the formula used in \"13.2.3 Hashing Complex Keys\" (`hash ^= fieldHash + 0x9e3779b9 + (hash << 6) + (hash >> 2)`), is a well-known pattern for combining hash values that uses bitwise operations and a large prime constant to thoroughly mix the bits of the new hash into the existing one. This ensures that the order of fields significantly impacts the final hash value, dramatically reducing the probability of collisions.\n\nIn summary, simply adding field hashes together would not be sufficient because it does not guarantee unique results for different orders of the same fields; a more sophisticated formula is needed to avoid such collisions and ensure good performance from the hash table.",
+   "generationMs": 28748,
+   "label": "correct",
+   "borderline": true,
+   "wrongSentences": [],
+   "note": "Sentence 3 gives poor bit mixing as the reason addition fails; the passage's reason is that addition ignores field order."
+  },
+  {
+   "id": "hash_combine_order#2",
+   "caseId": "hash_combine_order",
+   "split": "heldout",
+   "seed": 2,
+   "question": "Why doesn't BuzzDB just add the field hashes together when hashing a composite GROUP BY key?",
+   "passageIds": [
+    "ch13.038",
+    "ch08.023"
+   ],
+   "answer": "The provided text from \"13.2.3 Hashing Complex Keys\" explains why simply adding individual field hashes would be an inadequate strategy for combining hash values in this context.\n\nAccording to the formula used, `hash ^= fieldHash + 0x9e3779b9 + (hash << 6) + (hash >> 2);`, using bitwise operations and a large prime constant (`0x9e3779b9`) helps thoroughly mix the bits of the new hash into the existing one. This ensures that the order of fields significantly impacts the final hash value, reducing the probability of collisions.\n\nIn contrast, adding individual field hashes together would not provide sufficient mixing to account for changes in the relative importance or values of different fields within a composite key. For example, as mentioned in the text, keys like `{'Sales', 'Q1'}` and `{'Q1', 'Sales'}` produce the same final hash when simply added together due to their identical field order.\n\nTherefore, using a more sophisticated formula for combining accumulated hashes (`hash`) with the hash of each current field (`fieldHash`), as in the provided example code, is necessary to effectively handle composite keys and minimize collisions.",
+   "generationMs": 26713,
+   "label": "partly_wrong",
+   "borderline": false,
+   "wrongSentences": [
+    {
+     "id": 5,
+     "kind": "contradicted",
+     "why": "The two keys have different field order; addition gives the same hash because it ignores order, not 'due to their identical field order'."
+    },
+    {
+     "id": 4,
+     "kind": "unsupported",
+     "why": "'relative importance or values of different fields' is not the passage's reason.",
+     "borderline": true
+    }
+   ]
+  },
+  {
+   "id": "hash_combine_order#3",
+   "caseId": "hash_combine_order",
+   "split": "heldout",
+   "seed": 3,
+   "question": "Why doesn't BuzzDB just add the field hashes together when hashing a composite GROUP BY key?",
+   "passageIds": [
+    "ch13.038",
+    "ch08.023"
+   ],
+   "answer": "The provided text from \"13.2.3 Hashing Complex Keys\" explains why simply adding individual field hashes would be a poor combination strategy for hashing complex keys.\n\nAccording to this section, using `hash += fieldHash` as a combination strategy leads to incorrect collisions when the order of fields matters. For example, the keys `'Sales'`, `'Q1'` and `'Q1'`, `'Sales'` produce the same final hash due to the addition operation. \n\nIn contrast, the formula used in \"13.2.3 Hashing Complex Keys\" (`hash ^= fieldHash + 0x9e3779b9 + (hash << 6) + (hash >> 2);`) thoroughly mixes the bits of the new hash into the existing one using bitwise operations and a large prime constant, ensuring that the order of fields significantly impacts the final hash value. This reduces the probability of collisions.\n\nThe text from \"8.2.2 A Simple Hash Function\" explains how to map an arbitrary key to an index within a fixed array bounds through hashing functions like `hash(key) = key % capacity`. However, it does not directly address why adding field hashes together is problematic for complex keys. The explanation lies in the section on combining hash values using bitwise operations and large prime constants.",
+   "generationMs": 33601,
+   "label": "correct",
+   "borderline": false,
+   "wrongSentences": []
+  },
+  {
+   "id": "union_vs_union_all#1",
+   "caseId": "union_vs_union_all",
+   "split": "heldout",
+   "seed": 1,
+   "question": "Why is UNION ALL usually faster than UNION?",
+   "passageIds": [
+    "ch13.096",
+    "ch11.088"
+   ],
+   "answer": "**Connection:** The difference in speed between `UNION` and `UNION ALL` lies in how they handle duplicate rows.\n\n**Source Unit:** When using `UNION`, the database must eliminate all duplicates from the combined result set, which requires significant memory and CPU time. This step is expensive because it involves fully materializing the results of both sides of the operation and then applying a blocking algorithm to find unique rows.\n\nIn contrast, when using `UNION ALL`, the database simply concatenates the results without eliminating any duplicate rows. Since there's no need for duplicate elimination, this approach avoids the costly step of processing and storing intermediate data.\n\n**Reasoning:** By not having to eliminate duplicates, `UNION ALL` reduces memory usage and CPU overhead associated with the duplicate elimination process in `UNION`. This makes it generally faster than using `UNION`, especially when dealing with large datasets.",
+   "generationMs": 25005,
+   "label": "correct",
+   "borderline": false,
+   "wrongSentences": []
+  },
+  {
+   "id": "union_vs_union_all#2",
+   "caseId": "union_vs_union_all",
+   "split": "heldout",
+   "seed": 2,
+   "question": "Why is UNION ALL usually faster than UNION?",
+   "passageIds": [
+    "ch13.096",
+    "ch11.088"
+   ],
+   "answer": "The `UNION` operator requires duplicate elimination after concatenating the results from two queries, which involves materializing both sets and then eliminating duplicates. This step can be expensive in terms of memory and CPU time.\n\nIn contrast, `UNION ALL`, on the other hand, simply concatenates the results without eliminating duplicates upfront. Instead, it returns all tuples that appear in either query result set. Since this operation does not require duplicate elimination, it avoids the need to materialize both sets and then eliminate duplicates, which can save significant memory and CPU time.\n\nBy using `UNION ALL`, you avoid the overhead of fully processing and eliminating duplicates from each individual query's results before combining them. This makes `UNION ALL` a faster choice when there are no duplicate rows between the two queries or when the cost of duplicate elimination is high, such as in cases where memory or CPU resources are limited.\n\nIn your colleague's original query:\n\n```sql\n(SELECT * FROM sales_2022)\nUNION\n(SELECT * FROM sales_2023);\n```\n\nSince you know there are no overlapping records between `sales_2022` and `sales_2023`, the duplicate elimination step is unnecessary, making `UNION ALL` a suitable choice for this query.",
+   "generationMs": 30096,
+   "label": "partly_wrong",
+   "borderline": false,
+   "wrongSentences": [
+    {
+     "id": 6,
+     "kind": "contradicted",
+     "why": "UNION concatenates and then eliminates duplicates over the combined result, not from each query's results before combining."
+    },
+    {
+     "id": 7,
+     "kind": "unsupported",
+     "why": "UNION ALL is faster regardless; the conditions given (no duplicates, limited memory) are not the passage's claim.",
+     "borderline": true
+    }
+   ]
+  },
+  {
+   "id": "union_vs_union_all#3",
+   "caseId": "union_vs_union_all",
+   "split": "heldout",
+   "seed": 3,
+   "question": "Why is UNION ALL usually faster than UNION?",
+   "passageIds": [
+    "ch13.096",
+    "ch11.088"
+   ],
+   "answer": "The `UNION` operator in SQL must eliminate duplicate rows from the combined result set before producing output. This step requires significant memory and CPU time, as it involves fully materializing the results of both sides of the `UNION`, then applying a blocking algorithm to find unique rows.\n\nIn contrast, the `UNION ALL` operator simply concatenates the results of two queries without eliminating duplicates. Since it doesn't need to perform duplicate elimination, this step is skipped altogether, resulting in faster query execution times.\n\nAs explained earlier, the duplicate elimination step for `UNION` requires a blocking algorithm that can either sort the entire combined result set or build a hash table of it to find unique rows. Both options require significant memory and CPU time, which prevents any results from being returned to the user until the entire process is complete.\n\nOn the other hand, since `UNION ALL` doesn't eliminate duplicates, it only needs to concatenate the two queries' output streams without additional processing steps. This makes it a fast, streaming operation that can produce output immediately after receiving data from its input sources.\n\nTherefore, using `UNION ALL` instead of `UNION` is likely to make your query run much faster because it avoids the expensive duplicate elimination step associated with `UNION`.",
+   "generationMs": 39936,
+   "label": "correct",
+   "borderline": false,
+   "wrongSentences": []
+  },
+  {
+   "id": "querycomponents_defaults#1",
+   "caseId": "querycomponents_defaults",
+   "split": "heldout",
+   "seed": 1,
+   "question": "Why do the WHERE bounds in BuzzDB's QueryComponents default to the minimum and maximum integers?",
+   "passageIds": [
+    "ch14.040",
+    "ch14.041",
+    "ch12.093"
+   ],
+   "answer": "The default values for the lower bound (`lowerBound`) and upper bound (`upperBound`) fields in BuzzDB's `QueryComponents` struct are chosen carefully. \n\nBoolean flags default to `false`, and attribute indices default to `-1`, an invalid value that clearly indicates the corresponding clause was not found.\n\nHowever, when no `WHERE` clause is present, a tuple's value will always fall between `INT_MIN` and `INT_MAX`. This is because of the way the bounds are initialized. The lower bound defaults to `std::numeric_limits<int>::min()` (the minimum possible integer value), and the upper bound defaults to `std::numeric_limits<int>::max()`, which is also the maximum possible integer value.\n\nThis design choice allows for a clever optimization: if no `WHERE` clause is present, applying the filter logic becomes unconditional. The execution engine can apply the filter without worrying about whether the tuple's value falls within the specified range or not. As a result, the query behaves correctly even when there is no filtering condition to enforce.\n\nIn essence, this default behavior ensures that if no `WHERE` clause exists in the query string, the filter becomes effectively inactive, and the execution engine can proceed with the rest of the query logic without any issues.",
+   "generationMs": 33526,
+   "label": "correct",
+   "borderline": true,
+   "wrongSentences": [],
+   "note": "Sentences 6-7 garble 'apply the filter unconditionally' (it is always applied; the default bounds make it a no-op)."
+  },
+  {
+   "id": "querycomponents_defaults#2",
+   "caseId": "querycomponents_defaults",
+   "split": "heldout",
+   "seed": 2,
+   "question": "Why do the WHERE bounds in BuzzDB's QueryComponents default to the minimum and maximum integers?",
+   "passageIds": [
+    "ch14.040",
+    "ch14.041",
+    "ch12.093"
+   ],
+   "answer": "The default values for the lower bound (`lowerBound`) and upper bound (`upperBound`) fields in BuzzDB's `QueryComponents` struct are chosen carefully. If no `WHERE` clause is present, a tuple's value will always fall between `INT_MIN` (the minimum possible integer) and `INT_MAX` (the maximum possible integer). This design choice allows the execution engine to apply the filter logic unconditionally.\n\nBy defaulting these bounds to their extreme values when no `WHERE` clause is present, BuzzDB ensures that:\n\n1.  The filter will always be true for any tuple value.\n2.  The execution engine can safely apply the filter without worrying about invalid or out-of-range values.\n\nThis approach simplifies the processing of queries with missing or empty `WHERE` clauses and enables the system to handle such cases efficiently, making it easier to implement and optimize query execution plans.",
+   "generationMs": 17274,
+   "label": "correct",
+   "borderline": true,
+   "wrongSentences": [],
+   "note": "Sentences 5-6 add generic claims (out-of-range values, optimize plans)."
+  },
+  {
+   "id": "querycomponents_defaults#3",
+   "caseId": "querycomponents_defaults",
+   "split": "heldout",
+   "seed": 3,
+   "question": "Why do the WHERE bounds in BuzzDB's QueryComponents default to the minimum and maximum integers?",
+   "passageIds": [
+    "ch14.040",
+    "ch14.041",
+    "ch12.093"
+   ],
+   "answer": "The default values for the lower bound (`lowerBound`) and upper bound (`upperBound`) fields in BuzzDB's `QueryComponents` struct are chosen carefully. If no `WHERE` clause is present, a tuple's value will always fall between `INT_MIN` (the minimum possible integer) and `INT_MAX` (the maximum possible integer). This design choice ensures that the filter logic behaves correctly whether a `WHERE` clause was parsed or not.\n\nBy defaulting to these extreme values, BuzzDB effectively makes the filter a no-op. The execution engine can apply the filter logic unconditionally without worrying about potential out-of-range errors. As a result, the query's behavior remains consistent even when there is no explicit filtering condition specified in the query string.",
+   "generationMs": 26904,
+   "label": "correct",
+   "borderline": false,
+   "wrongSentences": []
+  },
+  {
+   "id": "compiled_vs_interpreted#1",
+   "caseId": "compiled_vs_interpreted",
+   "split": "heldout",
+   "seed": 1,
+   "question": "Why is a compiled query plan so much faster than the interpreted iterator model?",
+   "passageIds": [
+    "ch14.090",
+    "ch14.094",
+    "ch11.026"
+   ],
+   "answer": "The key optimizations in the fused compilation model enable significant performance improvements over the interpreted iterator model.\n\n**Elimination of Virtual Function Calls**: In the interpreter, each operator's method call incurs overhead due to virtual function calls. This leads to poor CPU cache utilization and reduces instruction-level parallelism. The compiled query plan eliminates these virtual function calls by inlining logic into a tight loop, allowing for more efficient use of the CPU.\n\n**Fused Operations and Inlined Logic**: By fusing operations together, the compiler can apply powerful optimizations such as keeping frequently accessed data in registers, reducing loads and stores to main memory. This improves instruction cache locality, enabling faster execution.\n\n**Specialized, Minimal Deserialization**: The compiled query plan's `ScanOperator` is optimized for a specific use case (materializing a full `Tuple` object with all its fields). In contrast, the interpreted iterator model requires parsing the entire raw tuple string and materializing a full `Tuple` object. This leads to significant overhead in terms of data movement between operators.\n\n**Push-Based vs Pull-Based Execution**: The compiled query plan uses a push-based approach, where data sources actively push tuples up through the operator tree as soon as they are available. In contrast, the interpreted iterator model is pull-based or demand-driven, requiring explicit requests from the top to produce work and data. This difference in execution strategy significantly impacts performance.\n\nThe combination of these optimizations leads to a dramatic improvement in performance, with compiled query plans often being 10x, 100x, or even more than 1,000x faster than their interpreted counterparts.",
+   "generationMs": 39294,
+   "label": "partly_wrong",
+   "borderline": false,
+   "wrongSentences": [
+    {
+     "id": 3,
+     "kind": "unsupported",
+     "why": "Passages never mention instruction-level parallelism."
+    },
+    {
+     "id": 7,
+     "kind": "contradicted",
+     "why": "The general-purpose interpreted ScanOperator materializes full Tuples; the compiled plan does minimal, specialized deserialization."
+    },
+    {
+     "id": 10,
+     "kind": "unsupported",
+     "why": "Passages do not say the compiled plan is push-based; ch11.026 only contrasts push and pull in general."
+    },
+    {
+     "id": 12,
+     "kind": "unsupported",
+     "why": "Push vs pull is not given as a reason for the speed gap.",
+     "borderline": true
+    }
+   ]
+  },
+  {
+   "id": "compiled_vs_interpreted#2",
+   "caseId": "compiled_vs_interpreted",
+   "split": "heldout",
+   "seed": 2,
+   "question": "Why is a compiled query plan so much faster than the interpreted iterator model?",
+   "passageIds": [
+    "ch14.090",
+    "ch14.094",
+    "ch11.026"
+   ],
+   "answer": "The key optimizations in the fused model enable dramatic performance improvements over the interpreted iterator model.\n\n**Fused Operations and Inlined Logic**\n\nBy eliminating virtual function calls, fusing logic into a tight loop, and keeping frequently used data in CPU registers, the compiler can apply powerful optimizations. This reduces instruction cache locality issues and minimizes repeated loads and stores to main memory.\n\n**Specialized, Minimal Deserialization**\n\nThe `ScanOperator` is general-purpose but materializes a full `Tuple` object with all its fields for each tuple string parsed. In contrast, the compiled version only needs to parse the raw tuple string without creating an entire `Tuple` object. This minimizes deserialization overhead.\n\nThese optimizations combined result in a significant performance gap between the compiled and interpreted query plans. The compiled plan can be 10x, 100x, or even more than 1,000x faster due to improved instruction cache locality, reduced virtual function call overhead, and minimized data movement between operators.",
+   "generationMs": 18659,
+   "label": "correct",
+   "borderline": false,
+   "wrongSentences": []
+  },
+  {
+   "id": "compiled_vs_interpreted#3",
+   "caseId": "compiled_vs_interpreted",
+   "split": "heldout",
+   "seed": 3,
+   "question": "Why is a compiled query plan so much faster than the interpreted iterator model?",
+   "passageIds": [
+    "ch14.090",
+    "ch14.094",
+    "ch11.026"
+   ],
+   "answer": "The key optimizations in the fused compilation model enable significant performance improvements over the interpreted iterator model.\n\n**Fused Operations and Inlined Logic**\n\nBy eliminating virtual function calls, fusing logic into a single block of code, and keeping critical variables in CPU registers, the compiler can apply powerful optimizations. This leads to:\n\n*   Improved instruction cache locality\n*   Reduced memory access overhead\n\nThese improvements result from the fused model's ability to reason about the entire loop sequence without jumping between different parts of memory.\n\n**Specialized, Minimal Deserialization**\n\nThe `ScanOperator` in the interpretive model must parse and materialize a full `Tuple` object with all its fields. In contrast, the compiled query plan uses a more efficient approach:\n\n*   The compiler generates code that directly accesses the required fields without creating an intermediate tuple.\n*   This reduces the overhead of data movement between operators.\n\n**Comparison of Characteristics**\n\nThe comparison table highlights key differences between the interpreted iterator model and the compiled fused model:\n\n| Characteristic | Interpretation (Iterator Model) | Compilation (Fused Model) |\n| :--- | :--- | :--- |\n| **Flexibility** | High. Operators are reusable components that can be dynamically assembled to execute any query. | Low. The generated code is brittle and specific to a single query plan. A small change in the SQL query requires generating entirely new code. |\n| **Performance** | Lower. Performance is fundamentally limited by \"per-tuple\" overhead of virtual function calls, data movement between operators, and poor CPU cache utilization. | High. By eliminating function call overhead and fusing logic into a tight loop, this model maximizes CPU cache efficiency and enables powerful compiler optimizations. |\n| **Code Complexity** | High (for the engine). Each operator is a non-trivial class that must manage its own state and interact with its children. The overall engine is a complex piece of software. | Low (for the generated code). The resulting code for a single query is often a simple, flat loop, making it easy for the CPU and the compiler to reason about. |\n| **Reusability** | High. The `FilterOperator`, `ScanOperator`, etc., are used in almost every query. | None. The generated code is single-purpose and discarded after the query finishes. |\n\nThe compiled fused model's performance advantages stem from its ability to:\n\n*   Eliminate virtual function calls\n*   Fuse logic into a tight loop for improved instruction cache locality\n*   Minimize data movement between operators through efficient deserialization\n\nThese optimizations result in significant performance improvements, often 10x or more than the interpreted iterator model.",
+   "generationMs": 74481,
+   "label": "correct",
+   "borderline": false,
+   "wrongSentences": []
+  }
+ ]
+}
